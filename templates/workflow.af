@@ -1,22 +1,13 @@
-get_keywords){
-	#resources: -n download -c 1 -t '7-00:00:00' -m '10gb'
-	. ~soft_bio_267/initializes/init_python
-	?
-	semtools -O HPO -C CNS/HP:0000118 > hpo_list
-	#remote_retriever -s pubmed -i hpo_list -o results
-}
-
-
-embbed_queries){
+%embbed_queries){
 	. ~soft_bio_267/initializes/init_python
 	export PATH=$code_path:$PATH
 	export MKL_NUM_THREADS=1 #Pytorch option for CPU
 	export OMP_NUM_THREADS=1 #Pytorch option for CPU
 	?
-	embedding_query.py $model_name get_keywords)/hpo_list $current_model out
+	embedding_query.py $model_name $queries $current_model out
 }
 
-get_abstracts){
+%get_abstracts){
 	resources: -n cal -c 50 -t '7-00:00:00' -m '200gb'
 	. ~soft_bio_267/initializes/init_python
 	export PATH=$code_path:$PATH
@@ -26,7 +17,7 @@ get_abstracts){
 	do
 		idx_name=`basename -s '.xml.gz' $f`
 		?
-		get_pubmed_index.py $f indexes/$idx_name.idx&
+		get_pubmed_index.py $f indexes/$idx_name.idx& #Un binario a parte (parte de preprocesado)
         if [ $((COUNTER % [cpu])) == 0 ]
         then
         	wait
@@ -36,13 +27,13 @@ get_abstracts){
 	wait
 }
 
-embbed_abstracts){
-	resources: -n bc -c 256 -t '7-00:00:00' -m '500gb'
+%embbed_abstracts){
+	resources: -n cal -c 36 -t '7-00:00:00' -m '80gb'
 	# Rebuild script to load once the model, load each corpus and apply all cpu (use autoflow cpu option in THREADS variables) in one embedding, write it to disk and take the next one
 	. ~soft_bio_267/initializes/init_python
 	export PATH=$code_path:$PATH
-	export MKL_NUM_THREADS=[cpu] #Pytorch option for CPU
-	export OMP_NUM_THREADS=[cpu] #Pytorch option for CPU
+	export MKL_NUM_THREADS=$(([cpu] - 6)) #Pytorch option for CPU
+	export OMP_NUM_THREADS=$(([cpu] - 6)) #Pytorch option for CPU
 	#WORKERS=$(([cpu] - 5))
 	#COUNTER=1
 	mkdir embeddings
@@ -73,12 +64,14 @@ query_abstracts){
 		?
 		get_semantic_similarity.py $f embbed_queries)/out.pkl semantic_scores/$pkl_name.txt 20
 	done
+	awk '{if($3 >= $min_similarity) print $2 "\t" $1 "\t" $3 }' semantic_scores/*.txt > filtered_scores 
+	cut -f 1,2 filtered_scores | aggregate_column_data -i - -x 2 -a 1 > pmID_profiles.txt
 }
 
-get_term_profiles){
+
+%get_term_profiles){ #Sacarlo para otra plantilla
 	resources: -n cal -c 1 -t '7-00:00:00' -m '200gb'
 	. ~soft_bio_267/initializes/init_python
-	awk '{if($3 >= $min_similarity) print $2 "\t" $1 "\t" $3 }' query_abstracts)/semantic_scores/*.txt > filtered_scores 
 	cut -f 1,2 filtered_scores | aggregate_column_data -i - -x 1 -a 2 > pubmed_profiles.txt
 	mkdir report
 	?
