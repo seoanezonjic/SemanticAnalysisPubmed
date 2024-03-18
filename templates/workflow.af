@@ -1,23 +1,32 @@
 %embbed_queries){
+	resources: -n sd -c 13
 	. ~soft_bio_267/initializes/init_python
-	export PATH=$code_path:$PATH
-	export MKL_NUM_THREADS=1 #Pytorch option for CPU
-	export OMP_NUM_THREADS=1 #Pytorch option for CPU
+
+	export PATH=$code_path:$PATH #TODO: Remove later
+	source $pyenv/bin/activate #TODO: Remove later
+
+
+	export MKL_NUM_THREADS=$(([cpu] - 3)) #Pytorch option for CPU
+	export OMP_NUM_THREADS=$(([cpu] - 3)) #Pytorch option for CPU
+	mkdir out
 	?
-	embedding_query.py $model_name $queries $current_model out
+	stEngine -m $MODEL_NAME -p $CURRENT_MODEL -q $queries -Q out
 }
 
 %get_abstracts){
 	resources: -n cal -c 50 -t '7-00:00:00' -m '200gb'
 	. ~soft_bio_267/initializes/init_python
-	export PATH=$code_path:$PATH
+
+	export PATH=$code_path:$PATH #TODO: Remove later
+	source $pyenv/bin/activate #TODO: Remove later
+
 	COUNTER=1
 	mkdir indexes
 	for f in $pubmed_path/*
 	do
 		idx_name=`basename -s '.xml.gz' $f`
 		?
-		get_pubmed_index.py $f indexes/$idx_name.idx& #Un binario a parte (parte de preprocesado)
+		get_pubmed_index -i $f -o indexes/$idx_name &
         if [ $((COUNTER % [cpu])) == 0 ]
         then
         	wait
@@ -27,53 +36,36 @@
 	wait
 }
 
-%embbed_abstracts){
-	resources: -n cal -c 36 -t '7-00:00:00' -m '80gb'
+embbed_abstracts){
+	resources: -n dgx -c  -t '4-00:00:00' -m '80gb' --gres "gpu=4"
+	#resources: -n sd -c 46 -t '4-00:00:00' -m '80gb'
 	# Rebuild script to load once the model, load each corpus and apply all cpu (use autoflow cpu option in THREADS variables) in one embedding, write it to disk and take the next one
-	. ~soft_bio_267/initializes/init_python
-	export PATH=$code_path:$PATH
-	export MKL_NUM_THREADS=$(([cpu] - 6)) #Pytorch option for CPU
-	export OMP_NUM_THREADS=$(([cpu] - 6)) #Pytorch option for CPU
-	#WORKERS=$(([cpu] - 5))
-	#COUNTER=1
+	#. ~soft_bio_267/initializes/init_python
+	. ~soft_bio_267/initializes/init_pytorch	
+
+	export PATH=$code_path:$PATH #TODO: Remove later
+	source $pyenv_gpu/bin/activate #TODO: Remove later
+
+	#export MKL_NUM_THREADS=$(([cpu] - 6)) #Pytorch option for CPU
+	#export OMP_NUM_THREADS=$(([cpu] - 6)) #Pytorch option for CPU
 	mkdir embeddings
-	for f in get_abstracts)/indexes/*
-	do
-		idx_name=`basename -s '.idx' $f`
-		?
-		embedding_corpus.py $model_name $current_model $f embeddings/$idx_name#&
-        #if [ $((COUNTER % WORKERS)) == 0 ]
-        #then
-        #	wait
-        #fi		
-		#COUNTER=$[$COUNTER +1]
-	done		
-	#wait
-}
-
-
-query_abstracts){
-	. ~soft_bio_267/initializes/init_python
-	export PATH=$code_path:$PATH
-	export MKL_NUM_THREADS=1 #Pytorch option for CPU
-	export OMP_NUM_THREADS=1 #Pytorch option for CPU
-	mkdir semantic_scores
-	for f in embbed_abstracts)/embeddings/*
-	do
-		pkl_name=`basename -s '.pkl' $f`
-		?
-		get_semantic_similarity.py $f embbed_queries)/out.pkl semantic_scores/$pkl_name.txt 20
-	done
-	awk '{if($3 >= $min_similarity) print $2 "\t" $1 "\t" $3 }' semantic_scores/*.txt > filtered_scores 
-	cut -f 1,2 filtered_scores | aggregate_column_data -i - -x 2 -a 1 > pmID_profiles.txt
-}
-
-
-%get_term_profiles){ #Sacarlo para otra plantilla
-	resources: -n cal -c 1 -t '7-00:00:00' -m '200gb'
-	. ~soft_bio_267/initializes/init_python
-	cut -f 1,2 filtered_scores | aggregate_column_data -i - -x 1 -a 2 > pubmed_profiles.txt
-	mkdir report
 	?
-	cohort_analyzer -i pubmed_profiles.txt -o report/pubmed -H -p 1 -d 0 -C 6 -m '' -S ',' #-a
+	stEngine -m $MODEL_NAME -p $CURRENT_MODEL -c get_abstracts)"/indexes/*.gz" -C embeddings
+}
+
+%query_abstracts){
+	resources: -n cal -c 13
+	. ~soft_bio_267/initializes/init_python
+
+	export PATH=$code_path:$PATH #TODO: Remove later
+	source $pyenv/bin/activate #TODO: Remove later
+
+	export MKL_NUM_THREADS=$(([cpu] - 3)) #Pytorch option for CPU
+	export OMP_NUM_THREADS=$(([cpu] - 3)) #Pytorch option for CPU
+	mkdir semantic_scores
+	embedded_query=$(echo "`basename $queries`.pkl")  
+	?
+	stEngine -C embbed_abstracts)"/embeddings/*" -Q embbed_queries)"/out/"$embedded_query -k 20 -o semantic_scores
+	awk '{if($3 >= $min_similarity) print $2 "\t" $1 "\t" $3 }' semantic_scores/$embedded_query > filtered_scores 
+	cut -f 1,2 filtered_scores | aggregate_column_data -i - -x 2 -a 1 > pmID_profiles.txt
 }

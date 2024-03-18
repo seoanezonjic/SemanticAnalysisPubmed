@@ -27,6 +27,6 @@ def get_abstract_index(file):
 
 abstract_index = get_abstract_index(sys.argv[1])
 
-with open(sys.argv[2], 'w') as f:
+with gzip.open(sys.argv[2], 'wt') as f:
 	for pmid, text in abstract_index:
 		f.write(f"{pmid}\t{text}\n")
