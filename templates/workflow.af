@@ -1,5 +1,5 @@
-%embbed_queries){
-	resources: -n sd -c 13
+embbed_queries){
+	resources: -n sd -c 13 -t '0-01:00:00'
 	. ~soft_bio_267/initializes/init_python
 
 	export PATH=$code_path:$PATH #TODO: Remove later
@@ -13,47 +13,56 @@
 	stEngine -m $MODEL_NAME -p $CURRENT_MODEL -q $queries -Q out
 }
 
-%get_abstracts){
-	resources: -n cal -c 50 -t '7-00:00:00' -m '200gb'
+get_abstracts){
+	resources: -n cal -c 50 -t '0-10:00:00' -m '200gb'
+	#resources: -n cal -c 10 -t '7-00:00:00' -m '60gb'	
 	. ~soft_bio_267/initializes/init_python
 
 	export PATH=$code_path:$PATH #TODO: Remove later
 	source $pyenv/bin/activate #TODO: Remove later
-
-	COUNTER=1
+	
+	n_cpus=$(([cpu] - 3))
 	mkdir indexes
-	for f in $pubmed_path/*
-	do
-		idx_name=`basename -s '.xml.gz' $f`
-		?
-		get_pubmed_index -i $f -o indexes/$idx_name &
-        if [ $((COUNTER % [cpu])) == 0 ]
-        then
-        	wait
-        fi		
-		COUNTER=$[$COUNTER +1]
+	?
+	get_pubmed_index -i "$pubmed_path/*" -o indexes -t "pubmed_" -k $pubmed_chunksize -c $n_cpus
+
+	#BEGIN:EXPERIMENTAL: TRYING TO PARALLELIZE 4 PUMBED FILLED BALANCED FOLDERS TO DRISTIBUTE THE EMBEDDING PROCESS IN 4 EXA NODES
+	ls indexes > indexes_list
+	for fold in `echo $tsv_folder | tr '-' ' '`; do
+        mkdir $fold
 	done
-	wait
+
+	total_lines=`wc -l < indexes_list`
+	for i in `seq 1 $total_lines`; do
+		modulo=$((i % $n_parallel_folders))
+		filepath=`sed "$i"'q;d' indexes_list`
+		ln -s $PWD/"indexes/"$filepath $PWD/$PARALLEL_FOLDERS_BASENAME$modulo/$filepath	
+	done
+	if [[ ! -d $PARALLEL_FOLDERS_BASENAME'0' || `ls $PARALLEL_FOLDERS_BASENAME'0' | wc -l` -eq 0 ]]; then exit 1 ; fi
+	#END:EXPERIMENTAL
 }
 
-embbed_abstracts){
-	resources: -n dgx -c  -t '4-00:00:00' -m '80gb' --gres "gpu=4"
+embbed_abstracts_[$folders_to_parallelize]){
+	resources: -n dgx -c 10 -t '1-00:00:00' -m '140gb' -A "gres=gpu:4"
 	#resources: -n sd -c 46 -t '4-00:00:00' -m '80gb'
 	# Rebuild script to load once the model, load each corpus and apply all cpu (use autoflow cpu option in THREADS variables) in one embedding, write it to disk and take the next one
 	#. ~soft_bio_267/initializes/init_python
-	. ~soft_bio_267/initializes/init_pytorch	
+	source ~soft_bio_267/initializes/init_pytorch	
 
+	echo [cpu]
 	export PATH=$code_path:$PATH #TODO: Remove later
-	source $pyenv_gpu/bin/activate #TODO: Remove later
+	source $pyenv/bin/activate #TODO: Remove later
 
-	#export MKL_NUM_THREADS=$(([cpu] - 6)) #Pytorch option for CPU
-	#export OMP_NUM_THREADS=$(([cpu] - 6)) #Pytorch option for CPU
+	export MKL_NUM_THREADS=1 #$(([cpu] - 6)) #Pytorch option for CPU
+	export OMP_NUM_THREADS=1 #$(([cpu] - 6)) #Pytorch option for CPU
 	mkdir embeddings
+
 	?
-	stEngine -m $MODEL_NAME -p $CURRENT_MODEL -c get_abstracts)"/indexes/*.gz" -C embeddings
+	stEngine -m $MODEL_NAME -p $CURRENT_MODEL -c get_abstracts)/(*)/"*.gz" -C embeddings -g "cuda:1,cuda:2,cuda:3,cuda:4" -v
+	if [ `ls embeddings | wc -l` -eq 0 ]; then exit 1; fi
 }
 
-%query_abstracts){
+query_abstracts_[$folders_to_parallelize]){
 	resources: -n cal -c 13
 	. ~soft_bio_267/initializes/init_python
 
@@ -63,9 +72,16 @@ embbed_abstracts){
 	export MKL_NUM_THREADS=$(([cpu] - 3)) #Pytorch option for CPU
 	export OMP_NUM_THREADS=$(([cpu] - 3)) #Pytorch option for CPU
 	mkdir semantic_scores
-	embedded_query=$(echo "`basename $queries`.pkl")  
+	embedded_query=$(echo "`basename $queries`.pkl")
+
 	?
-	stEngine -C embbed_abstracts)"/embeddings/*" -Q embbed_queries)"/out/"$embedded_query -k 20 -o semantic_scores
+	stEngine -C !embbed_abstracts_*!"/embeddings/*" -Q embbed_queries)"/out/"$embedded_query -k 20 -o semantic_scores
 	awk '{if($3 >= $min_similarity) print $2 "\t" $1 "\t" $3 }' semantic_scores/$embedded_query > filtered_scores 
 	cut -f 1,2 filtered_scores | aggregate_column_data -i - -x 2 -a 1 > pmID_profiles.txt
+	if [ ! -s pmID_profiles.txt  ]; then exit 1; fi
+}
+
+aggregate_results){
+	?
+	cat !query_abstracts_!/pmID_profiles.txt > pmID_profiles.txt
 }
