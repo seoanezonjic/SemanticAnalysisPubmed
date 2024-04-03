@@ -1,8 +1,0 @@
-%get_term_profiles){
-	resources: -n cal -c 1 -t '7-00:00:00' -m '200gb'
-	. ~soft_bio_267/initializes/init_python
-	cut -f 1,2 filtered_scores | aggregate_column_data -i - -x 1 -a 2 > pubmed_profiles.txt
-	mkdir report
-	?
-	cohort_analyzer -i pubmed_profiles.txt -o report/pubmed -H -p 1 -d 0 -C 6 -m '' -S ',' #-a
-}

@@ -1,19 +1,18 @@
-embbed_queries){
+%embbed_queries){
 	resources: -n sd -c 13 -t '0-01:00:00'
 	. ~soft_bio_267/initializes/init_python
 
 	export PATH=$code_path:$PATH #TODO: Remove later
 	source $pyenv/bin/activate #TODO: Remove later
 
-
 	export MKL_NUM_THREADS=$(([cpu] - 3)) #Pytorch option for CPU
 	export OMP_NUM_THREADS=$(([cpu] - 3)) #Pytorch option for CPU
 	mkdir out
 	?
-	stEngine -m $MODEL_NAME -p $CURRENT_MODEL -q $queries -Q out
+	stEngine -m $model_name -p $current_model -q $queries -Q out -v
 }
 
-get_abstracts){
+%get_abstracts){
 	resources: -n cal -c 50 -t '0-10:00:00' -m '200gb'
 	#resources: -n cal -c 10 -t '7-00:00:00' -m '60gb'	
 	. ~soft_bio_267/initializes/init_python
@@ -36,14 +35,14 @@ get_abstracts){
 	for i in `seq 1 $total_lines`; do
 		modulo=$((i % $n_parallel_folders))
 		filepath=`sed "$i"'q;d' indexes_list`
-		ln -s $PWD/"indexes/"$filepath $PWD/$PARALLEL_FOLDERS_BASENAME$modulo/$filepath	
+		ln -s $PWD/"indexes/"$filepath $PWD/$parallel_folders_basename$modulo/$filepath	
 	done
-	if [[ ! -d $PARALLEL_FOLDERS_BASENAME'0' || `ls $PARALLEL_FOLDERS_BASENAME'0' | wc -l` -eq 0 ]]; then exit 1 ; fi
+	if [[ ! -d $parallel_folders_basename'0' || `ls $parallel_folders_basename'0' | wc -l` -eq 0 ]]; then exit 1 ; fi
 	#END:EXPERIMENTAL
 }
 
-embbed_abstracts_[$folders_to_parallelize]){
-	resources: -n dgx -c 10 -t '1-00:00:00' -m '140gb' -A "gres=gpu:4"
+%embbed_abstracts_[$folders_to_parallelize]){
+	resources: --exclusive -n dgx -c 10 -t '2-00:00:00' -m '120gb' -A "gres=gpu:4"
 	#resources: -n sd -c 46 -t '4-00:00:00' -m '80gb'
 	# Rebuild script to load once the model, load each corpus and apply all cpu (use autoflow cpu option in THREADS variables) in one embedding, write it to disk and take the next one
 	#. ~soft_bio_267/initializes/init_python
@@ -53,16 +52,18 @@ embbed_abstracts_[$folders_to_parallelize]){
 	export PATH=$code_path:$PATH #TODO: Remove later
 	source $pyenv/bin/activate #TODO: Remove later
 
-	export MKL_NUM_THREADS=1 #$(([cpu] - 6)) #Pytorch option for CPU
-	export OMP_NUM_THREADS=1 #$(([cpu] - 6)) #Pytorch option for CPU
+	export MKL_NUM_THREADS=$(([cpu] - 3)) #Pytorch option for CPU
+	export OMP_NUM_THREADS=$(([cpu] - 3)) #Pytorch option for CPU
 	mkdir embeddings
 
+	gpu_csv=`echo $gpu_devices | tr '-' ','`
+	echo "using gpu devices: $gpu_csv"
 	?
-	stEngine -m $MODEL_NAME -p $CURRENT_MODEL -c get_abstracts)/(*)/"*.gz" -C embeddings -g "cuda:1,cuda:2,cuda:3,cuda:4" -v
+	stEngine -m $model_name -p $current_model -c get_abstracts)/(*)/"*.gz" -C embeddings -g $gpu_csv -v
 	if [ `ls embeddings | wc -l` -eq 0 ]; then exit 1; fi
 }
 
-query_abstracts_[$folders_to_parallelize]){
+%query_abstracts_[$folders_to_parallelize]){
 	resources: -n cal -c 13
 	. ~soft_bio_267/initializes/init_python
 
@@ -72,16 +73,25 @@ query_abstracts_[$folders_to_parallelize]){
 	export MKL_NUM_THREADS=$(([cpu] - 3)) #Pytorch option for CPU
 	export OMP_NUM_THREADS=$(([cpu] - 3)) #Pytorch option for CPU
 	mkdir semantic_scores
-	embedded_query=$(echo "`basename $queries`.pkl")
-
+	query_basename=`basename $queries`
 	?
-	stEngine -C !embbed_abstracts_*!"/embeddings/*" -Q embbed_queries)"/out/"$embedded_query -k 20 -o semantic_scores
-	awk '{if($3 >= $min_similarity) print $2 "\t" $1 "\t" $3 }' semantic_scores/$embedded_query > filtered_scores 
-	cut -f 1,2 filtered_scores | aggregate_column_data -i - -x 2 -a 1 > pmID_profiles.txt
-	if [ ! -s pmID_profiles.txt  ]; then exit 1; fi
+	stEngine -C !embbed_abstracts_*!"/embeddings/*" -Q embbed_queries)"/out/"$query_basename".pkl" -k 20 -o semantic_scores -v
+	awk '{if($3 >= $min_similarity) print $2 "\t" $1 "\t" $3 }' semantic_scores/$query_basename > filtered_scores 
+	#cut -f 1,2 filtered_scores | aggregate_column_data -i - -x 2 -a 1 > pmID_profiles.txt
+	#cut -f 1,2 filtered_scores | aggregate_column_data -i - -x 1 -a 2 > term_profiles.txt
+	aggregate_column_data -i filtered_scores -x 2 -a 1,3 > pmID_profiles.txt
+	aggregate_column_data -i filtered_scores -x 1 -a 2,3 > term_profiles.txt
+	if [[ ! -s pmID_profiles.txt || ! -s term_profiles.txt ]]; then exit 1; fi #exit if no results
 }
 
 aggregate_results){
+	resources: -n cal -c 1 -t '0-01:00:00'
 	?
+	cat !query_abstracts_!/filtered_scores > filtered_scores
 	cat !query_abstracts_!/pmID_profiles.txt > pmID_profiles.txt
+	cat !query_abstracts_!/term_profiles.txt > term_profiles.txt
+
+	cp filtered_scores $results_path/filtered_scores
+	cp pmID_profiles.txt $results_path/pmID_profiles.txt
+	cp term_profiles.txt $results_path/term_profiles.txt
 }
