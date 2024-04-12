@@ -23,7 +23,7 @@
 	n_cpus=$(([cpu] - 3))
 	mkdir indexes
 	?
-	get_pubmed_index -i "$pubmed_path/*" -o indexes -t "pubmed_" -k $pubmed_chunksize -c $n_cpus
+	get_pubmed_index -i "$pubmed_path/*" -o indexes -t "pubmed_" -k $pubmed_chunksize -c $n_cpus -d
 
 	#BEGIN:EXPERIMENTAL: TRYING TO PARALLELIZE 4 PUMBED FILLED BALANCED FOLDERS TO DRISTIBUTE THE EMBEDDING PROCESS IN 4 EXA NODES
 	ls indexes > indexes_list
@@ -39,10 +39,14 @@
 	done
 	if [[ ! -d $parallel_folders_basename'0' || `ls $parallel_folders_basename'0' | wc -l` -eq 0 ]]; then exit 1 ; fi
 	#END:EXPERIMENTAL
+
+	cat *.err | grep stats | grep UserWarning > debug_stats.txt
+	get_report_pubmed_index.py debug_stats.txt $report_templates_path/debug_report_get_pubmed_index.txt -o debug_report_get_pubmed_index
+	cp debug_report_get_pubmed_index.html $results_path/reports/debug_report_get_pubmed_index.html
 }
 
 %embbed_abstracts_[$folders_to_parallelize]){
-	resources: --exclusive -n dgx -c 10 -t '2-00:00:00' -m '120gb' -A "gres=gpu:4"
+	resources: -n dgx -c 10 -t '0-12:00:00' -m '120gb' -A gres=gpu:8 #TODO: it lacks to also add --exclusive flag using -A option
 	#resources: -n sd -c 46 -t '4-00:00:00' -m '80gb'
 	# Rebuild script to load once the model, load each corpus and apply all cpu (use autoflow cpu option in THREADS variables) in one embedding, write it to disk and take the next one
 	#. ~soft_bio_267/initializes/init_python
@@ -63,8 +67,8 @@
 	if [ `ls embeddings | wc -l` -eq 0 ]; then exit 1; fi
 }
 
-%query_abstracts_[$folders_to_parallelize]){
-	resources: -n cal -c 13
+query_abstracts_[$folders_to_parallelize]){
+	resources: -n cal -c 13 -m 150G
 	. ~soft_bio_267/initializes/init_python
 
 	export PATH=$code_path:$PATH #TODO: Remove later
@@ -75,23 +79,31 @@
 	mkdir semantic_scores
 	query_basename=`basename $queries`
 	?
-	stEngine -C !embbed_abstracts_*!"/embeddings/*" -Q embbed_queries)"/out/"$query_basename".pkl" -k 20 -o semantic_scores -v
-	awk '{if($3 >= $min_similarity) print $2 "\t" $1 "\t" $3 }' semantic_scores/$query_basename > filtered_scores 
+	stEngine -C !embbed_abstracts_*!"/embeddings/*" -Q embbed_queries)"/out/"$query_basename".pkl" -k 5000 -o semantic_scores -v -t $min_similarity
+	awk '{print $2 "\t" $1 "\t" $3 }' semantic_scores/$query_basename > filtered_scores
+	#awk '{if($3 >= $min_similarity) print $2 "\t" $1 "\t" $3 }' semantic_scores/$query_basename > filtered_scores 
 	#cut -f 1,2 filtered_scores | aggregate_column_data -i - -x 2 -a 1 > pmID_profiles.txt
 	#cut -f 1,2 filtered_scores | aggregate_column_data -i - -x 1 -a 2 > term_profiles.txt
-	aggregate_column_data -i filtered_scores -x 2 -a 1,3 > pmID_profiles.txt
-	aggregate_column_data -i filtered_scores -x 1 -a 2,3 > term_profiles.txt
+	aggregate_column_data -i filtered_scores -x 2 -a 1,3 > term_profiles.txt
+	aggregate_column_data -i filtered_scores -x 1 -a 2,3 > pmID_profiles.txt
 	if [[ ! -s pmID_profiles.txt || ! -s term_profiles.txt ]]; then exit 1; fi #exit if no results
 }
 
 aggregate_results){
-	resources: -n cal -c 1 -t '0-01:00:00'
+	resources: -n cal -c 4 --mem 50G -t '0-01:00:00'
+	. ~soft_bio_267/initializes/init_python	
+	query_basename=`basename $queries`
 	?
+	cat !query_abstracts_!/semantic_scores/$query_basename > unfiltered_scores
 	cat !query_abstracts_!/filtered_scores > filtered_scores
 	cat !query_abstracts_!/pmID_profiles.txt > pmID_profiles.txt
 	cat !query_abstracts_!/term_profiles.txt > term_profiles.txt
 
+	cp unfiltered_scores $results_path/unfiltered_scores
 	cp filtered_scores $results_path/filtered_scores
 	cp pmID_profiles.txt $results_path/pmID_profiles.txt
 	cp term_profiles.txt $results_path/term_profiles.txt
+	echo [cpu]
+	report_html -d filtered_scores -t $report_templates_path/debug_report_semantic_scores_stats.txt -o debug_report_semantic_scores_stats
+	cp debug_report_semantic_scores_stats.html $results_path/reports/debug_report_semantic_scores_stats.html
 }

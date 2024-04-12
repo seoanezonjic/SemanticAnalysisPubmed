@@ -1,0 +1,24 @@
+embbed_queries_[$package_number]){
+	. ~soft_bio_267/initializes/init_python
+	export PATH=$code_path:$PATH #TODO: Remove later
+	source $pyenv/bin/activate #TODO: Remove later
+
+	current_package_number=(*)
+	start_line=`echo "$current_package_number*$package_size+1" | bc`
+	subset_table -i $mondo_hpo_profiles -s $start_line -l $package_size > chunk_specific_mondo_hpo_profiles
+	
+	n_lines=`wc -l chunk_specific_mondo_hpo_profiles | cut -f 1 -d " "`
+	for row_idx in `seq 1 $n_lines`; do
+		sed "$row_idx"'q;d' $mondo_hpo_profiles > current_mondo_hpo_profile
+		current_mondo_id=`cut -f 1 current_mondo_hpo_profile`
+		grep $current_mondo_id $mondo_pubmed_profiles > mondo_pubmeds_goldstandard
+		?
+		semtools -i $llm_pmID_profiles -O HPO -o current_mondo_sims -s lin --reference_profiles current_mondo_hpo_profile -S ","
+		get_mondo_filtered_pmID_sim_values.py -s current_mondo_sims -m mondo_pubmeds_goldstandard -o filtrados.txt
+	done
+}
+
+aggregate_results){
+	?
+	cat !embbed_queries_!/filtrados.txt > filtrados.txt
+}

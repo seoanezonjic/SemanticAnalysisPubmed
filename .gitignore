@@ -1,0 +1,6 @@
+models/
+inputs/
+queries/
+results/
+tmp/
+workflow_paths
