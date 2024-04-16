@@ -1,0 +1,8 @@
+<% 
+import warnings
+plotter.hash_vars["filtrados.txt"].insert(0, ["PMID", "original_score", "normalized_score", "strict_pos", "non_strict_pos", "MONDO"])
+%>
+${plotter.boxplot(
+                id="filtrados.txt", x_label="Rankings", fields=[0,2], header=True, row_names=True, func = lambda table: warnings.warn(f"{table}"),
+                title="LLM vs MONDO rankings from profile comparison (semantic similarity between HPO profiles)" 
+                )}

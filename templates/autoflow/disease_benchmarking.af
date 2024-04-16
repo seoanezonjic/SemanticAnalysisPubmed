@@ -1,0 +1,25 @@
+calc_sem_sim_chunk_[$package_number]){
+	. ~soft_bio_267/initializes/init_python
+	export PATH=$code_path:$PATH #TODO: Remove later
+	source $pyenv/bin/activate #TODO: Remove later
+
+	current_package_number=(*)
+	start_line=`echo "$current_package_number*$package_size+1" | bc`
+	subset_table -i $mondo_pmid_hpo_common_ids -s $start_line -l $package_size | cut -f 1 > chunk_specific_mondo_IDs
+	
+	n_lines=`wc -l chunk_specific_mondo_IDs | cut -f 1 -d " "`
+	for row_idx in `seq 1 $n_lines`; do
+		current_mondo_ID=$(sed "$row_idx"'q;d' chunk_specific_mondo_IDs)
+		grep $current_mondo_ID $mondo_hpo_profiles > current_mondo_hpo_profile
+		grep $current_mondo_ID $mondo_pmID_profiles > current_mondo_pubmeds_goldstandard
+		?
+		semtools -i $llm_pmID_profiles -O HPO -o current_mondo_sims -s lin --reference_profiles current_mondo_hpo_profile -S ","
+		get_mondo_filtered_pmID_sim_values.py -s current_mondo_sims -m current_mondo_pubmeds_goldstandard -o filtrados.txt
+	done
+}
+
+aggregate_results){
+	?
+	cat !calc_sem_sim_chunk_!/filtrados.txt > llm_vs_mondo_semantic_similarity_hpo_based.txt
+	cp llm_vs_mondo_semantic_similarity_hpo_based.txt $results_path/llm_vs_mondo_semantic_similarity_hpo_based.txt
+}

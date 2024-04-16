@@ -29,14 +29,14 @@
             <td>
                 <h1> Prevalence distribution of PMIDs </h1>
                 ${plotter.static_plot_main(id="PMIDs_prevalence", width = 800, height = 800, header=True, row_names= False, fields=[0], title="PMIDs Prevalence", y_label = "Number of PMIDs", x_label = "Number of HPs related with the PMID",
-                plotting_function=  lambda data, plotter_list: plotter_list["plt"].hist(data, bins=20, range=(0, 20)) )}
+                plotting_function=  lambda data, plotter_list: plotter_list["plt"].hist(data, bins=20, range=(0, 10)) )}
             </td>
         </tr>
         <tr>
             <td>
                 <h1> Prevalence distribution of HPOs </h1>
                 ${plotter.static_plot_main(id="HPOs_prevalence", width = 800, height = 800, header=True, row_names= False, fields=[0], title="HPOs Prevalence", y_label = "Number of HPs", x_label = "Number of PMIDs related with the HP",
-                plotting_function=  lambda data, plotter_list: plotter_list["plt"].hist(data, bins=60, range=(0, 1000))  )}
+                plotting_function=  lambda data, plotter_list: plotter_list["plt"].hist(data, bins=60, range=(0, 200))  )}
             </td>
         </tr>            
     </table>
