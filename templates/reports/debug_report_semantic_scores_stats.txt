@@ -3,9 +3,9 @@
     from matplotlib import rcParams
     rcParams['patch.force_edgecolor'] = True 
 
-    plotter.hash_vars["PMIDs_prevalence"] = [["PREVALENCE"]] + [ [value] for value in list(Counter([row[0] for row in plotter.hash_vars["filtered_scores"]]).values()) ] 
-    plotter.hash_vars["HPOs_prevalence"] = [["PREVALENCE"]] + [ [value] for value in list(Counter([row[1] for row in plotter.hash_vars["filtered_scores"]]).values()) ]
-    plotter.hash_vars["filtered_scores"].insert(0, ["PMID", "HP", "SIM_SCORE"])
+    plotter.hash_vars["PMIDs_prevalence"] = [["PREVALENCE"]] + [ [value] for value in list(Counter([row[0] for row in plotter.hash_vars["llm_filtered_scores"]]).values()) ] 
+    plotter.hash_vars["HPOs_prevalence"] = [["PREVALENCE"]] + [ [value] for value in list(Counter([row[1] for row in plotter.hash_vars["llm_filtered_scores"]]).values()) ]
+    plotter.hash_vars["llm_filtered_scores"].insert(0, ["PMID", "HP", "SIM_SCORE"])
 %>
 
 <style>
@@ -14,6 +14,15 @@
   margin-left: auto;
   margin-right: auto;
 }
+
+.placeholder{
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+    width: 100%;
+    height: 50%;
+
+}
 </style>
 
 <div>
@@ -21,23 +30,27 @@
         <tr>
             <td>
                 <h1> General distribution of semantic scores (lower threshold: 0.5) </h1>
-                ${plotter.static_plot_main(id="filtered_scores", width = 800, height = 800, header=True, row_names= False, fields=[2], title="Semantic Scores", x_label = "Semantic Score", y_label = "Number of relations",
+                ${plotter.static_plot_main(id="llm_filtered_scores", width = 800, height = 800, header=True, row_names= False, fields=[2], 
+                title="Semantic Scores", x_label = "Semantic Score", y_label = "Number of relations", rezisable=True,
                 plotting_function=  lambda data, plotter_list: plotter_list["plt"].hist(data, bins=60) )}
             </td>
         </tr>
         <tr>
             <td>
                 <h1> Prevalence distribution of PMIDs </h1>
-                ${plotter.static_plot_main(id="PMIDs_prevalence", width = 800, height = 800, header=True, row_names= False, fields=[0], title="PMIDs Prevalence", y_label = "Number of PMIDs", x_label = "Number of HPs related with the PMID",
+                ${plotter.static_plot_main(id="PMIDs_prevalence", width = 800, height = 800, header=True, row_names= False, fields=[0], 
+                title="PMIDs Prevalence", y_label = "Number of PMIDs", x_label = "Number of HPs related with the PMID", rezisable=True,
                 plotting_function=  lambda data, plotter_list: plotter_list["plt"].hist(data, bins=20, range=(0, 10)) )}
             </td>
         </tr>
         <tr>
             <td>
                 <h1> Prevalence distribution of HPOs </h1>
-                ${plotter.static_plot_main(id="HPOs_prevalence", width = 800, height = 800, header=True, row_names= False, fields=[0], title="HPOs Prevalence", y_label = "Number of HPs", x_label = "Number of PMIDs related with the HP",
+                ${plotter.static_plot_main(id="HPOs_prevalence", width = 800, height = 800, header=True, row_names= False, fields=[0], 
+                title="HPOs Prevalence", y_label = "Number of HPs", x_label = "Number of PMIDs related with the HP", rezisable=True,
                 plotting_function=  lambda data, plotter_list: plotter_list["plt"].hist(data, bins=60, range=(0, 200))  )}
             </td>
         </tr>            
     </table>
 </div>
+<div class="placeholder"></div>

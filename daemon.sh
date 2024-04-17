@@ -1,5 +1,5 @@
 #! /usr/bin/env bash
-. ~soft_bio_267/initializes/init_python
+source ~soft_bio_267/initializes/init_python
 
 #PATHS
 export CURRENT_PATH=`pwd`
@@ -39,7 +39,8 @@ export N_PARALLEL_FOLDERS=${#PARALLEL_FOLDERS_ARRAY[@]}
 
 #OTHER VARIABLES
 export PUBMED_CHUNKSIZE=300000
-export MIN_SIMILARITY=0.80
+export MIN_SIMILARITY=0.7
+export TOP_K=200
 #export GPU_DEVICES="cuda:0-cuda:1-cuda:2-cuda:3"
 export GPU_DEVICES="cuda:0-cuda:1-cuda:2-cuda:3-cuda:4-cuda:5-cuda:6-cuda:7"
 export database_ids="OMIM ORPHA"
@@ -74,6 +75,7 @@ elif [ "$1" == "engine_wf" ] ; then
                 \\$model_name=$MODEL_NAME,
         	\\$current_model=$CURRENT_MODEL,
                 \\$min_similarity=$MIN_SIMILARITY,
+                \\$top_k=$TOP_K,
                 \\$queries=$QUERIES_PATH/hpo_list,
                 \\$pubmed_path=$PUBMED_PATH,
                 \\$pyenv=$PYENV,
@@ -84,6 +86,7 @@ elif [ "$1" == "engine_wf" ] ; then
                 \\$n_parallel_folders=$N_PARALLEL_FOLDERS,
                 \\$pubmed_chunksize=$PUBMED_CHUNKSIZE,
                 \\$results_path=$RESULTS_PATH,
+                \\$tmp_path=$TMP_PATH,
                 \\$report_templates_path=$REPORTS_TEMPLATES       
             " | tr -d [:space:]`
         AutoFlow -e -w $AUTOFLOW_TEMPLATES/workflow.af -V $variables -o $ENGINE_EXEC_PATH -m 20gb -t 3-00:00:00 -n cal -c 10 -L $2
@@ -91,6 +94,7 @@ elif [ "$1" == "engine_wf" ] ; then
 elif [ "$1" == "bench_wf" ]; then
         mkdir -p $PROFILES_EXEC_PATH
         source ~soft_bio_267/initializes/init_autoflow
+        source $PYENV/bin/activate #TODO: Remove later
         cut -f 1,2 $RESULTS_PATH/llm_pmID_profiles_with_cosine_sim.txt > $RESULTS_PATH/llm_pmID_profiles.txt
 
         #Get LLM and MONDO common pmIDs
@@ -124,11 +128,15 @@ elif [ "$1" == "bench_wf" ]; then
         AutoFlow -e -w $AUTOFLOW_TEMPLATES/disease_benchmarking.af -V $variables -o $PROFILES_EXEC_PATH -m 4gb -t 3-00:00:00 -n cal -c 2 -L $2
 
 elif [ "$1" == "reports" ]; then
-        count_mondo_entries.sh
+        #Preparing some data for benchmarking part
+        prepare_type_of_record_counts.sh
+
         #stEngine reports
-        get_report_pubmed_index.py -d $RESULTS_PATH/abstracts_debug_stats.txt \
-                                   -t $REPORTS_TEMPLATES/debug_report_get_pubmed_index.txt \
-                                   -o $RESULTS_PATH/reports/debug_report_get_pubmed_index
+        pmd_idx_stats=$RESULTS_PATH/abstracts_stats_tables
+        get_pubmed_index_stats.py -d $TMP_PATH/abstracts_debug_stats.txt -o $pmd_idx_stats
+        report_html -d $pmd_idx_stats/file_proportion_stats,$pmd_idx_stats/file_raw_stats,$pmd_idx_stats/total_proportion_stats,$pmd_idx_stats/total_stats \
+                    -t $REPORTS_TEMPLATES/debug_report_get_pubmed_index.txt \
+                    -o $RESULTS_PATH/reports/debug_report_get_pubmed_index
 
         report_html -d $RESULTS_PATH/llm_filtered_scores \
                     -t $REPORTS_TEMPLATES/debug_report_semantic_scores_stats.txt \
@@ -136,7 +144,7 @@ elif [ "$1" == "reports" ]; then
 
         #Benchmark reports
         report_html -t $REPORTS_TEMPLATES/llm_mondo_similitudes.txt \
-                    -d $RESULTS_PATH/llm_vs_mondo_semantic_similarity_hpo_based.txt \
+                    -d $RESULTS_PATH/llm_vs_mondo_semantic_similarity_hpo_based.txt,$RESULTS_PATH/number_of_records.txt \
                     -o $RESULTS_PATH/reports/llm_vs_mondo_similitudes
 
 elif [ `echo $1 | cut -f 2 -d "_"` == "check" ]; then 

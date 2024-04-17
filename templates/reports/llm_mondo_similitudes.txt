@@ -1,8 +1,48 @@
 <% 
 import warnings
-plotter.hash_vars["filtrados.txt"].insert(0, ["PMID", "original_score", "normalized_score", "strict_pos", "non_strict_pos", "MONDO"])
+warnear_tabla = lambda table: warnings.warn(f"{table[0:5]}")
+
+plotter.hash_vars["llm_vs_mondo_semantic_similarity_hpo_based.txt"].insert(
+    0, ["PMID", "original_score", "rankings", "strict_pos", "non_strict_pos", "MONDO"])
+
+for idx,row in enumerate(plotter.hash_vars["llm_vs_mondo_semantic_similarity_hpo_based.txt"]):
+    if idx == 0: row.insert(0, "mock_grouping_factor")
+    else: row.insert(0, f"factor")
+
+plotter.hash_vars["prueba"] = [[1,2,3,4,5], [1,2,3,4,5], [1,2,3,4,5], [1,2,3,4,5], [1,2,3,4,5]]
 %>
-${plotter.boxplot(
-                id="filtrados.txt", x_label="Rankings", fields=[0,2], header=True, row_names=True, func = lambda table: warnings.warn(f"{table}"),
-                title="LLM vs MONDO rankings from profile comparison (semantic similarity between HPO profiles)" 
-                )}
+${plotter.table(id="prueba", header=True, row_names=False, styled="dt")}
+${plotter.table(id="prueba", header=True, row_names=False, styled="bs")}
+
+
+<style>
+.outer {
+    display: grid;
+    justify-content: center;
+    align-items: center;
+}
+.inner {
+    align-self: center;
+    justify-self: center;
+}
+</style>
+
+<table>
+    <tr class="outer">
+        <td class="inner">
+            <h1>Section 1</h1>
+            ${plotter.boxplot(
+                id="llm_vs_mondo_semantic_similarity_hpo_based.txt", x_label="Rankings", fields=[0,3], header=True, row_names=True,
+                title="LLM vs MONDO rankings from profile comparison (semantic similarity between HPO profiles)" ,
+                config= { "graphOrientation": "vertical"}
+            )}
+        </td>
+    </tr>
+    <tr class="outer">
+        <td class="inner">
+            <h1>Section 2</h1>    
+            ${plotter.barplot(id="number_of_records.txt", translate=True, header=False, row_names=True, 
+            title="Number of records in each table")}
+        </td>
+    </tr>
+</table>

@@ -41,7 +41,7 @@
 	#END:EXPERIMENTAL
 
 	cat *.err | grep stats | grep UserWarning > abstracts_debug_stats.txt
-	cp abstracts_debug_stats.txt $results_path/abstracts_debug_stats.txt
+	cp abstracts_debug_stats.txt $tmp_path/abstracts_debug_stats.txt
 }
 
 %embbed_abstracts_[$folders_to_parallelize]){
@@ -79,7 +79,7 @@ query_abstracts_[$folders_to_parallelize]){
 	mkdir semantic_scores
 	query_basename=`basename $queries`
 	?
-	stEngine -C !embbed_abstracts_*!"/embeddings/*" -Q embbed_queries)"/out/"$query_basename".pkl" -k 60000 -o semantic_scores -v -t $min_similarity
+	stEngine -C !embbed_abstracts_*!"/embeddings/*" -Q embbed_queries)"/out/"$query_basename".pkl" -k $top_k -o semantic_scores -v -t $min_similarity
 	awk '{print $2 "\t" $1 "\t" $3 }' semantic_scores/$query_basename > filtered_scores
 	rm semantic_scores/$query_basename
 	aggregate_column_data -i filtered_scores -x 2 -a 1,3 > term_profiles.txt

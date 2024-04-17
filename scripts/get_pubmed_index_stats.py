@@ -12,11 +12,8 @@ parser = argparse.ArgumentParser(description=f'Usage: {os.path.basename(__file__
 parser.add_argument("-d", "--data_file", dest="data_file", default= None,
                     help="Path to file containing the abstract related stats returned from xml abstracts parsing")
 
-parser.add_argument("-t", "--template_file", dest="template_file", default= None,
-                    help="Path to the template file to be used for the report generation")
-
-parser.add_argument("-o", "--output_file", dest="output_file", default= None, 
-                    help="Path to the output file to be generated with the report")
+parser.add_argument("-o", "--output_path", dest="output_path", default= None, 
+                    help="Output path to save the stats taken from the logs")
 
 opts = parser.parse_args()
 options = vars(opts)
@@ -75,7 +72,10 @@ total_stats = [["rows", "all_total", "no_abstract", "no_pmid", "abstract"], ["ro
 total_proportion_stats = [["rows", "proportion_no_abstract", "proportion_no_pmid", "proportion_abstract"], ["row 0", all_no_abstract_proportion, all_no_pmid_proportion, all_abstract_proportion]]
 
 container = {'file_raw_stats' : file_raw_stats, 'file_proportion_stats' : file_proportion_stats, 'total_stats' : total_stats, 'total_proportion_stats' : total_proportion_stats}
-template = open(options["template_file"]).read()
-report = Py_report_html(container, options["output_file"], True, True)
-report.build(template)
-report.write(f'{options["output_file"]}.html')
+
+#create ouput folder if it does not exist
+if not os.path.exists(options["output_path"]): os.makedirs(options["output_path"])
+for filename, content in container.items():
+    with open(os.path.join(options["output_path"],filename), 'w') as f:
+        for row in content:
+            f.write('\t'.join([str(item) for item in row]) + '\n')
