@@ -39,8 +39,9 @@ export N_PARALLEL_FOLDERS=${#PARALLEL_FOLDERS_ARRAY[@]}
 
 #OTHER VARIABLES
 export PUBMED_CHUNKSIZE=300000
-export MIN_SIMILARITY=0.7
-export TOP_K=200
+export SOFT_MIN_SIMILARITY=0.6
+export HARD_MIN_SIMILARITY=0.7
+export TOP_K=60000
 #export GPU_DEVICES="cuda:0-cuda:1-cuda:2-cuda:3"
 export GPU_DEVICES="cuda:0-cuda:1-cuda:2-cuda:3-cuda:4-cuda:5-cuda:6-cuda:7"
 export database_ids="OMIM ORPHA"
@@ -74,7 +75,8 @@ elif [ "$1" == "engine_wf" ] ; then
                 \\$code_path=$CODE_PATH,
                 \\$model_name=$MODEL_NAME,
         	\\$current_model=$CURRENT_MODEL,
-                \\$min_similarity=$MIN_SIMILARITY,
+                \\$soft_min_similarity=$SOFT_MIN_SIMILARITY,
+                \\$hard_min_similarity=$HARD_MIN_SIMILARITY,
                 \\$top_k=$TOP_K,
                 \\$queries=$QUERIES_PATH/hpo_list,
                 \\$pubmed_path=$PUBMED_PATH,
@@ -129,23 +131,23 @@ elif [ "$1" == "bench_wf" ]; then
 
 elif [ "$1" == "reports" ]; then
         #Preparing some data for benchmarking part
-        prepare_type_of_record_counts.sh
-
-        #stEngine reports
+        prepare_type_of_record_counts.sh #outputs to $TMP_PATH/number_of_records_raw.txt
         pmd_idx_stats=$RESULTS_PATH/abstracts_stats_tables
         get_pubmed_index_stats.py -d $TMP_PATH/abstracts_debug_stats.txt -o $pmd_idx_stats
-        report_html -d $pmd_idx_stats/file_proportion_stats,$pmd_idx_stats/file_raw_stats,$pmd_idx_stats/total_proportion_stats,$pmd_idx_stats/total_stats \
-                    -t $REPORTS_TEMPLATES/debug_report_get_pubmed_index.txt \
-                    -o $RESULTS_PATH/reports/debug_report_get_pubmed_index
+         
+        data_paths=`echo -e "
+        $pmd_idx_stats/file_proportion_stats,
+        $pmd_idx_stats/file_raw_stats,
+        $pmd_idx_stats/total_proportion_stats,
+        $pmd_idx_stats/total_stats,
+        $RESULTS_PATH/llm_filtered_scores,
+        $RESULTS_PATH/llm_vs_mondo_semantic_similarity_hpo_based.txt,
+        $RESULTS_PATH/number_of_records.txt
+        " | tr -d [:space:]` 
 
-        report_html -d $RESULTS_PATH/llm_filtered_scores \
-                    -t $REPORTS_TEMPLATES/debug_report_semantic_scores_stats.txt \
-                    -o $RESULTS_PATH/reports/debug_report_semantic_scores_stats
-
-        #Benchmark reports
-        report_html -t $REPORTS_TEMPLATES/llm_mondo_similitudes.txt \
-                    -d $RESULTS_PATH/llm_vs_mondo_semantic_similarity_hpo_based.txt,$RESULTS_PATH/number_of_records.txt \
-                    -o $RESULTS_PATH/reports/llm_vs_mondo_similitudes
+        report_html -d $data_paths \
+                    -t $REPORTS_TEMPLATES/stEngine_and_similitudes.txt \
+                    -o $RESULTS_PATH/reports/stEngine_and_similitudes
 
 elif [ `echo $1 | cut -f 2 -d "_"` == "check" ]; then 
 	. ~soft_bio_267/initializes/init_autoflow

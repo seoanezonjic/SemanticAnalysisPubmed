@@ -1,0 +1,72 @@
+<% 
+    import os
+    from collections import Counter
+    from matplotlib import rcParams
+    rcParams['patch.force_edgecolor'] = True
+
+    #get_pubmed_index part preprocessing 
+    top_5_no_abstracts = [[row[1], row[3]] for row in plotter.hash_vars["file_raw_stats"][1:6]]
+    top_5_no_abstracts_transposed = list(map(list, zip(*top_5_no_abstracts)))
+    plotter.hash_vars["top_5_no_abstracts"] = top_5_no_abstracts_transposed
+    plotter.hash_vars["top_5_no_abstracts"][0] = [os.path.basename(file) for file in plotter.hash_vars["top_5_no_abstracts"][0]]
+
+    #Sentence Transformers' brought papers stats  preprocessing
+    plotter.hash_vars["PMIDs_prevalence"] = [["PREVALENCE"]] + [ [value] for value in list(Counter([row[0] for row in plotter.hash_vars["llm_filtered_scores"]]).values()) ] 
+    plotter.hash_vars["HPOs_prevalence"] = [["PREVALENCE"]] + [ [value] for value in list(Counter([row[1] for row in plotter.hash_vars["llm_filtered_scores"]]).values()) ]
+    plotter.hash_vars["llm_filtered_scores"].insert(0, ["PMID", "HP", "SIM_SCORE"])
+
+    #LM_vs_MONDO comparisons preprocessing
+    plotter.hash_vars["llm_vs_mondo_semantic_similarity_hpo_based.txt"].insert(
+    0, ["PMID", "original_score", "rankings", "strict_pos", "non_strict_pos", "MONDO"])
+
+    for idx,row in enumerate(plotter.hash_vars["llm_vs_mondo_semantic_similarity_hpo_based.txt"]):
+        if idx == 0: row.insert(0, "mock_grouping_factor")
+        else: row.insert(0, f"factor")
+%>
+<% plotter.set_header() %>
+
+${ plotter.create_title('Pubmed Abstract extraction and preprocessing', id='section1_from', hlevel=1, indexable=True, clickable=True, t_id='section1_to', clickable_text = '(Click me)') }
+<%
+    section1 =  plotter.barplot(id="total_stats", header=True, row_names= True, 
+                                title="Pubmed articles stats (total, number of articles without abstract, number of articles without PMID and number of articles with abstracts)", 
+                                config = { 'graphOrientation' : 'vertical'}) + "\n"
+    section1 += plotter.barplot(id="total_proportion_stats", header=True, row_names= True, 
+                                title="Pubmed articles proportion stats (proportion of articles without abstract,\nproportion of articles without PMID and proportion of articles with abstracts)", 
+                                config = { 'graphOrientation' : 'vertical'}) + "\n"
+    section1 += plotter.density(id="file_proportion_stats", header=True, row_names= True, fields=[0,2], 
+                                title="Distribution of proportion of articles without abstract among all (original) PMID chunks") + "\n"
+    section1 += plotter.barplot(id="top_5_no_abstracts", header=True, row_names= True, 
+                                title="Top 5 chunks with the highest number of pubmed articles without abstract", 
+                                config = { "setMinX": 0}) + "\n"
+%>
+<div style="overflow: hidden; display: flex; flex-direction: row; justify-content: center;">
+${ plotter.create_collapsable_container('section1_to', section1) }
+</div>
+
+
+${ plotter.create_title("Sentence Transformers' brought paper stats", id='section2_from', hlevel=1, indexable=True, clickable=True, t_id='section2_to', clickable_text = '(Click me)') }
+<%
+    section2 =  plotter.static_plot_main(id="llm_filtered_scores", width = 800, height = 800, header=True, row_names= False, fields=[2], rezisable=True,
+                                        title="General distribution of semantic scores", x_label = "Semantic Score", y_label = "Number of relations",
+                                        plotting_function=  lambda data, plotter_list: plotter_list["plt"].hist(data, bins=60) ) + "\n"
+    section2 += plotter.static_plot_main(id="PMIDs_prevalence", width = 800, height = 800, header=True, row_names= False, fields=[0], rezisable=True,
+                                        title="Prevalence distribution of PMIDs", y_label = "Number of PMIDs", x_label = "Number of HPs related with the PMID", 
+                                        plotting_function=  lambda data, plotter_list: plotter_list["plt"].hist(data, bins=20, range=(0, 10)) ) + "\n"
+    section2 += plotter.static_plot_main(id="HPOs_prevalence", width = 800, height = 800, header=True, row_names= False, fields=[0], rezisable=True,
+                                        title="Prevalence distribution of HPOs", y_label = "Number of HPs", x_label = "Number of PMIDs related with the HP", 
+                                        plotting_function=  lambda data, plotter_list: plotter_list["plt"].hist(data, bins=60, range=(0, 200))  ) + "\n"
+%>
+<div style="overflow: hidden; display: flex; flex-direction: row; justify-content: center;">
+${ plotter.create_collapsable_container('section2_to', section2) }
+</div>
+
+${ plotter.create_title("Sentence Transformers' brought paper stats", id='section3_from', hlevel=1, indexable=True, clickable=True, t_id='section3_to', clickable_text = '(Click me)') }
+<%
+    section3 = plotter.boxplot( id="llm_vs_mondo_semantic_similarity_hpo_based.txt", x_label="Rankings", fields=[0,3], header=True, row_names=True,
+                                title="LLM vs MONDO rankings from profile comparison (semantic similarity between HPO profiles)" , 
+                                config= { "graphOrientation": "vertical"}) + "\n"
+    section3 += plotter.barplot(id="number_of_records.txt", translate=True, header=False, row_names=True, title="Number of records in each table") + "\n"
+%>
+<div style="overflow: hidden; display: flex; flex-direction: row; justify-content: center;">
+${ plotter.create_collapsable_container('section3_to', section3) }
+</div>

@@ -79,12 +79,10 @@ query_abstracts_[$folders_to_parallelize]){
 	mkdir semantic_scores
 	query_basename=`basename $queries`
 	?
-	stEngine -C !embbed_abstracts_*!"/embeddings/*" -Q embbed_queries)"/out/"$query_basename".pkl" -k $top_k -o semantic_scores -v -t $min_similarity
-	awk '{print $2 "\t" $1 "\t" $3 }' semantic_scores/$query_basename > filtered_scores
+	stEngine -C !embbed_abstracts_*!"/embeddings/*" -Q embbed_queries)"/out/"$query_basename".pkl" -k $top_k -o semantic_scores -v -t $soft_min_similarity
+	if [[ ! -s filtered_scores.txt ]]; then exit 1; fi #exit if no results
+	awk '{print $2 "\t" $1 "\t" $3 }' semantic_scores/$query_basename > soft_filtered_scores
 	rm semantic_scores/$query_basename
-	aggregate_column_data -i filtered_scores -x 2 -a 1,3 > term_profiles.txt
-	aggregate_column_data -i filtered_scores -x 1 -a 2,3 > pmID_profiles.txt
-	if [[ ! -s pmID_profiles.txt || ! -s term_profiles.txt || ! -s filtered_scores.txt ]]; then exit 1; fi #exit if no results
 }
 
 aggregate_results){
@@ -92,11 +90,11 @@ aggregate_results){
 	. ~soft_bio_267/initializes/init_python	
 	query_basename=`basename $queries`
 	?
-	cat !query_abstracts_!/filtered_scores > filtered_scores
-	cat !query_abstracts_!/pmID_profiles.txt > pmID_profiles.txt
-	cat !query_abstracts_!/term_profiles.txt > term_profiles.txt
-
-	cp filtered_scores $results_path/llm_filtered_scores
+	cat !query_abstracts_!/soft_filtered_scores | awk '{if($3 >= '$hard_min_similarity') print $0}' > hard_filtered_scores
+	aggregate_column_data -i hard_filtered_scores -x 2 -a 1,3 > term_profiles.txt
+	aggregate_column_data -i hard_filtered_scores -x 1 -a 2,3 > pmID_profiles.txt
+	
+	cp hard_filtered_scores $results_path/llm_filtered_scores
 	cp pmID_profiles.txt $results_path/llm_pmID_profiles_with_cosine_sim.txt
 	cp term_profiles.txt $results_path/llm_term_profiles.txt
 }
