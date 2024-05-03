@@ -19,5 +19,5 @@ done
 cat $TMP_PATH/OMIM2MONDO_raw $TMP_PATH/ORPHA2MONDO_raw > $TMP_PATH/MERGED2MONDO_raw
 sort -u $TMP_PATH/MERGED2MONDO_raw > $TMP_PATH/MERGED2MONDO_filtered_HP
 #semtools -i $TMP_PATH/MERGED2MONDO_filtered_HP -O HPO -o $TMP_PATH/MERGED2MONDO -T "HP:0000118" --2cols --out2cols -c # Clean redundant HPO and childs not in phenotopyc abnormality
-semtools -i $TMP_PATH/MERGED2MONDO_filtered_HP -O HPO -o $TMP_PATH/MERGED2MONDO -T "HP:0000118" --2cols --out2cols # Clean childs not in phenotopyc abnormality
+semtools -i $TMP_PATH/MERGED2MONDO_filtered_HP -O HPO -o $TMP_PATH/MERGED2MONDO -c -T "HP:0000118" --2cols --out2cols # Clean childs not in phenotopyc abnormality
 aggregate_column_data -i $TMP_PATH/MERGED2MONDO -x 1 -a 2 > $INPUTS_PATH/mondo_hpo_profiles.txt

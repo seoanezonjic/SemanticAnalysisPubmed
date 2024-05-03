@@ -61,10 +61,10 @@ if [ "$1" == "download" ] ; then # DOWNLOAD MODEL and other resources
         wget http://purl.obolibrary.org/obo/hp/hpoa/phenotype.hpoa -O $TMP_PATH/phenotype.hpoa
 
         #Process MONDO-PUMBED relations
-        zcat tmp/publication_disease.all.tsv.gz | tail -n +2 | cut -f 1,5 | grep MONDO | grep PMID | sed "s/PMID://g" | \
+        zcat tmp/publication_disease.all.tsv.gz | tail -n +2 | cut -f 1,5,13 | grep MONDO | grep PMID | grep direct | cut -f 1,2 | sed "s/PMID://g" | \
                 aggregate_column_data -i - -x 2 -a 1 > $INPUTS_PATH/mondo_pubmed_profiles.txt
         #Process MONDO-HP relations
-        prepare_mondo_hp_relations.sh
+        prepare_mondo_hp_relations.sh #Outpus to $INPUTS_PATH/mondo_hpo_profiles.txt
 
 elif [ "$1" == "queries" ] ; then
         mkdir -p $QUERIES_PATH
@@ -100,7 +100,6 @@ elif [ "$1" == "bench_wf" ]; then
         mkdir -p $PROFILES_EXEC_PATH
         source ~soft_bio_267/initializes/init_autoflow
         source $PYENV/bin/activate #TODO: Remove later
-        cut -f 1,2 $RESULTS_PATH/llm_pmID_profiles_with_cosine_sim.txt > $RESULTS_PATH/llm_pmID_profiles.txt
 
         #Get LLM and MONDO common pmIDs
         desaggregate_column_data -i $INPUTS_PATH/mondo_pubmed_profiles.txt -x 2 | aggregate_column_data -i - -x 2 -a 1 > $TMP_PATH/reverse_aggregated_mondo_pmid_profiles.txt
