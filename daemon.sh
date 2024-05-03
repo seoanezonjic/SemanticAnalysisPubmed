@@ -20,12 +20,13 @@ export TEMPLATES_PATH=$CURRENT_PATH/templates
 export AUTOFLOW_TEMPLATES=$TEMPLATES_PATH/autoflow
 export REPORTS_TEMPLATES=$TEMPLATES_PATH/reports
 
-mkdir $RESULTS_PATH; mkdir $RESULTS_PATH/reports; mkdir $INPUTS_PATH ; mkdir $TMP_PATH; mkdir $TEMPLATES_PATH; mkdir $AUTOFLOW_TEMPLATES; mkdir $REPORTS_TEMPLATES; mkdir $QUERIES_PATH
+mkdir -p $RESULTS_PATH; mkdir -p $RESULTS_PATH/reports; mkdir -p $INPUTS_PATH ; mkdir -p $TMP_PATH
+mkdir -p $AUTOFLOW_TEMPLATES; mkdir -p $REPORTS_TEMPLATES; mkdir -p $QUERIES_PATH ; mkdir -p $TEMPLATES_PATH
 export PATH=$CODE_PATH:$PATH
 
 #PATHS TO EXECUTION OF TEMPLATES
-export ENGINE_EXEC_PATH=$FSCRATCH/SemanticAnalysisPubmed/EXECS_engine
-export PROFILES_EXEC_PATH=$FSCRATCH/SemanticAnalysisPubmed/EXECS_profiles
+export ENGINE_EXEC_PATH=$FSCRATCH"/SemanticAnalysisPubmed/EXECS_engine_splitted" #Previous value=$FSCRATCH"/SemanticAnalysisPubmed/EXECS_engine"
+export PROFILES_EXEC_PATH=$FSCRATCH"/SemanticAnalysisPubmed/EXECS_profiles"
 echo -e "engine_wf\t$ENGINE_EXEC_PATH" > $CURRENT_PATH/workflow_paths
 echo -e "bench_wf\t$PROFILES_EXEC_PATH" >> $CURRENT_PATH/workflow_paths
 
@@ -41,7 +42,8 @@ export N_PARALLEL_FOLDERS=${#PARALLEL_FOLDERS_ARRAY[@]}
 export PUBMED_CHUNKSIZE=300000
 export SOFT_MIN_SIMILARITY=0.6
 export HARD_MIN_SIMILARITY=0.7
-export TOP_K=60000
+export TOP_K=40 #Previous value=60000
+export SPLITTED="-s" #Previous value=""
 #export GPU_DEVICES="cuda:0-cuda:1-cuda:2-cuda:3"
 export GPU_DEVICES="cuda:0-cuda:1-cuda:2-cuda:3-cuda:4-cuda:5-cuda:6-cuda:7"
 export database_ids="OMIM ORPHA"
@@ -78,6 +80,7 @@ elif [ "$1" == "engine_wf" ] ; then
                 \\$soft_min_similarity=$SOFT_MIN_SIMILARITY,
                 \\$hard_min_similarity=$HARD_MIN_SIMILARITY,
                 \\$top_k=$TOP_K,
+                \\$splitted=$SPLITTED,
                 \\$queries=$QUERIES_PATH/hpo_list,
                 \\$pubmed_path=$PUBMED_PATH,
                 \\$pyenv=$PYENV,
@@ -123,14 +126,16 @@ elif [ "$1" == "bench_wf" ]; then
                 \\$mondo_pmID_profiles=$INPUTS_PATH/MONDO_PMIDs_cleaned,
                 \\$mondo_hpo_profiles=$INPUTS_PATH/MONDO_HPOs_cleaned,
                 \\$llm_pmID_profiles=$RESULTS_PATH/llm_pmID_profiles.txt,
+                \\$pubmed_metadata=$RESULTS_PATH/pubmed_metadata,
                 \\$package_number="0-$PACKAGE_NUMBER",
                 \\$package_size=$PACKAGE_SIZE,
                 \\$report_templates_path=$REPORTS_TEMPLATES
                 " | tr -d [:space:]`
-        AutoFlow -e -w $AUTOFLOW_TEMPLATES/disease_benchmarking.af -V $variables -o $PROFILES_EXEC_PATH -m 4gb -t 3-00:00:00 -n cal -c 2 -L $2
+        AutoFlow -e -w $AUTOFLOW_TEMPLATES/disease_benchmarking.af -V $variables -o $PROFILES_EXEC_PATH -m 40gb -t 3-00:00:00 -n cal -c 2 -L $2
 
 elif [ "$1" == "reports" ]; then
         #Preparing some data for benchmarking part
+        source $PYENV/bin/activate #TODO: Remove later
         prepare_type_of_record_counts.sh #outputs to $TMP_PATH/number_of_records_raw.txt
         pmd_idx_stats=$RESULTS_PATH/abstracts_stats_tables
         get_pubmed_index_stats.py -d $TMP_PATH/abstracts_debug_stats.txt -o $pmd_idx_stats
@@ -142,7 +147,9 @@ elif [ "$1" == "reports" ]; then
         $pmd_idx_stats/total_stats,
         $RESULTS_PATH/llm_filtered_scores,
         $RESULTS_PATH/llm_vs_mondo_semantic_similarity_hpo_based.txt,
-        $RESULTS_PATH/number_of_records.txt
+        $RESULTS_PATH/number_of_records.txt,
+        $INPUTS_PATH/MONDO_HPOs_cleaned,
+        $RESULTS_PATH/llm_pmID_profiles.txt
         " | tr -d [:space:]` 
 
         report_html -d $data_paths \

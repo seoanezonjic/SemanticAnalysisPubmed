@@ -14,7 +14,7 @@ calc_sem_sim_chunk_[$package_number]){
 		grep $current_mondo_ID $mondo_pmID_profiles > current_mondo_pubmeds_goldstandard
 		?
 		semtools -i $llm_pmID_profiles -O HPO -o current_mondo_sims -s lin --reference_profiles current_mondo_hpo_profile -S ","
-		get_mondo_filtered_pmID_sim_values.py -s current_mondo_sims -m current_mondo_pubmeds_goldstandard -o filtrados.txt
+		get_mondo_filtered_pmID_sim_values.py -s current_mondo_sims -m current_mondo_pubmeds_goldstandard -p $pubmed_metadata -o filtrados.txt -t 10
 	done
 }
 

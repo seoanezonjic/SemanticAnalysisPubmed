@@ -3,4 +3,5 @@ inputs/
 queries/
 results/
 tmp/
+previous_results/
 workflow_paths
