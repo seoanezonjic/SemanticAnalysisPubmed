@@ -1,5 +1,5 @@
 embbed_queries){
-	resources: -n sd -c 13 -t '0-01:00:00'
+	resources: -n sd -c 30 -t '0-05:00:00'
 	. ~soft_bio_267/initializes/init_python
 
 	export PATH=$code_path:$PATH #TODO: Remove later
@@ -13,7 +13,7 @@ embbed_queries){
 }
 
 get_abstracts){
-	resources: -n cal -c 50 -t '0-10:00:00' -m '200gb'
+	resources: -n cal -c 50 -t '0-10:00:00' -m '400gb'
 	#resources: -n cal -c 10 -t '7-00:00:00' -m '60gb'	
 	. ~soft_bio_267/initializes/init_python
 
@@ -23,7 +23,7 @@ get_abstracts){
 	n_cpus=$(([cpu] - 3))
 	mkdir indexes
 	?
-	get_pubmed_index -i "$pubmed_path/*" -o indexes -t "pubmed_" -k $pubmed_chunksize -c $n_cpus -d $splitted
+	get_pubmed_index -i "$pubmed_path/*" -o indexes -t "pubmed_" -k $pubmed_chunksize -c $n_cpus -d $splitted $paper $equivalences
 
 	#BEGIN:EXPERIMENTAL: TRYING TO PARALLELIZE 4 PUMBED FILLED BALANCED FOLDERS TO DRISTIBUTE THE EMBEDDING PROCESS IN 4 EXA NODES
 	ls indexes > indexes_list
@@ -45,7 +45,8 @@ get_abstracts){
 }
 
 embbed_abstracts_[$folders_to_parallelize]){
-	resources: -n dgx -c 10 -t '0-12:00:00' -m '120gb' -A exclude=exa04;gres=gpu:8
+	resources: -n dgx -c 10 -t '1-12:00:00' -m '360gb' -A exclude=exa01;$n_gpus
+	#resources: -n dgx -c 10 -t '0-12:00:00' -m '120gb' -A exclude=exa04;gres=gpu:8
 	#resources: -n sd -c 46 -t '4-00:00:00' -m '80gb'
 	# Rebuild script to load once the model, load each corpus and apply all cpu (use autoflow cpu option in THREADS variables) in one embedding, write it to disk and take the next one
 	#. ~soft_bio_267/initializes/init_python
@@ -68,7 +69,7 @@ embbed_abstracts_[$folders_to_parallelize]){
 
 query_abstracts_[$folders_to_parallelize]){
 	#resources: -n cal -c 13 -m 150G
-	resources: -n cal -c 10 -m 200G
+	resources: -n cal -c 100 -m 600G
 	. ~soft_bio_267/initializes/init_python
 
 	export PATH=$code_path:$PATH #TODO: Remove later
@@ -94,7 +95,7 @@ aggregate_results){
 	collapse_same_HPs_inside_of_splitted_abstract.py -i hard_filtered_scores_raw -o hard_filtered_scores
 	aggregate_column_data -i hard_filtered_scores -x 2 -a 1,3,4 > llm_term_profiles.txt
 	aggregate_column_data -i hard_filtered_scores -x 1 -a 2,3,4 > llm_pmID_profiles_with_cosine_sim.txt
-	
+
 	cut -f 1,2 hard_filtered_scores | semtools -i - -O HPO -c -T "HP:0000118" --2cols --out2cols -o llm_pmID_profiles_cleaned_2cols.txt
 	aggregate_column_data -i llm_pmID_profiles_cleaned_2cols.txt -x 1 -a 2 > llm_pmID_profiles_cleaned.txt
 
@@ -102,14 +103,10 @@ aggregate_results){
 	for filename in get_abstracts)/indexes/* ; do
 		zcat $filename | cut -f 1,3,4,5,6,7 >> pubmed_metadata_full
 	done
-
-	echo -e "pubmed_id\toriginal_file\tpublication_year" > pubmed_metadata
-	intersect_columns -a pubmed_metadata_full -b pmID_profiles.txt -A 1 -B 1 -k c --full | cut -f 1,2,3,4,5,6 >> pubmed_metadata 
-	#rm pubmed_metadata_full
 	
 	cp hard_filtered_scores $results_path/llm_filtered_scores
 	cp llm_pmID_profiles_with_cosine_sim.txt $results_path/llm_pmID_profiles_with_cosine_sim.txt
 	cp llm_pmID_profiles_cleaned.txt $results_path/llm_pmID_profiles.txt
 	cp llm_term_profiles.txt $results_path/llm_term_profiles.txt
-	cp pubmed_metadata $results_path/pubmed_metadata
+	cp pubmed_metadata_full $results_path/pubmed_metadata
 }

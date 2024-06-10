@@ -2,6 +2,7 @@
 import argparse
 import os
 from collections import defaultdict
+import warnings
 
 #################################################################################
 ## METHODS
@@ -12,7 +13,11 @@ def load_similarities(filename):
     with open(filename) as f:
         for line in f:
             pmid_and_tag, hp, score = line.strip().split('\t')
-            pmid, tag = pmid_and_tag.split('_', maxsplit=1)
+            try:
+                pmid, tag = pmid_and_tag.split('_', maxsplit=1)
+            except:
+                warnings.warn(f'Error: There was an error trying to parse the following line: {line}')
+                continue
             if pmid not in pmids:
                 pmids[pmid] = {}
             if hp not in pmids[pmid]:

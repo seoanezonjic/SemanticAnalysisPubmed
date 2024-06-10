@@ -1,4 +1,4 @@
-calc_sem_sim_chunk_[$package_number]){
+calc_sem_sim_chunk_$gold_[$package_number]){
 	. ~soft_bio_267/initializes/init_python
 	export PATH=$code_path:$PATH #TODO: Remove later
 	source $pyenv/bin/activate #TODO: Remove later
@@ -16,10 +16,11 @@ calc_sem_sim_chunk_[$package_number]){
 		semtools -i $llm_pmID_profiles -O HPO -o current_mondo_sims -s lin --reference_profiles current_mondo_hpo_profile -S ","
 		get_mondo_filtered_pmID_sim_values.py -s current_mondo_sims -m current_mondo_pubmeds_goldstandard -p $pubmed_metadata -o filtrados.txt -t 10
 	done
+	if [[ ! -s filtrados.txt ]]; then exit 1; fi #exit if no results
 }
 
 aggregate_results){
 	?
-	cat !calc_sem_sim_chunk_!/filtrados.txt > llm_vs_mondo_semantic_similarity_hpo_based.txt
-	cp llm_vs_mondo_semantic_similarity_hpo_based.txt $results_path/llm_vs_mondo_semantic_similarity_hpo_based.txt
+	cat !calc_sem_sim_chunk_$gold_!/filtrados.txt > llm_vs_$gold'_semantic_similarity_hpo_based.txt'
+	cp llm_vs_$gold'_semantic_similarity_hpo_based.txt' $results_path/llm_vs_$gold'_semantic_similarity_hpo_based.txt'
 }

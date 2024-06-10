@@ -1,16 +1,17 @@
 <% 
-    import os, math
+    from py_exp_calc.exp_calc import flatten
+    import os, math, copy
+    import numpy as np
+    import pandas as pd
     import base64
-    from collections import Counter
+    from collections import Counter, defaultdict
     from io import BytesIO
-    from collections import Counter
     from matplotlib import rcParams
     from matplotlib import pyplot as plt
     from matplotlib_venn import venn2
     rcParams['patch.force_edgecolor'] = True
 
-    ###### Custom methods to plot ######
-    def embedd_venn(sets_raw, labels, plotter, idd):
+    def embedd_venn(sets_raw, labels, plotter, idd, title):
         plt.figure(figsize=(10,6))
         sets = Counter()
         sets['01'] = sets_raw[0]
@@ -25,28 +26,39 @@
             h.append(v.get_patch_by_id(i))
             l.append(sets[i])
         ax.legend(handles=h, labels=l, title="counts")
+        plt.title(title)
         
         plt.show(block=False)
         tmpfile = BytesIO()
         plt.savefig(tmpfile, format='png')
-        html = plotter.embed_img(tmpfile, img_attribs=f"id=\'{idd}\' width=50vw height=40vh", bytesIO=True, rezisable=True)
+        html = plotter.embed_img(tmpfile, img_attribs=f"id=\'{idd}\' width=45% height=45%", bytesIO=True, rezisable=False)
         plt.close('all')
         return html
 
     ###### Functions to pass to "func" plotter parameter ######
     def process_pie_data(data):
         data[0][0] = "Type"
-        data.pop(2)
+        #data.pop(2)
 
     def remove_other_stats(data):
         for times in range(5):
             for row in data: row.pop(1)
 
-    def transform_to_percentages(table):
+    def transforms_to_log10(table):
         for idx, row in enumerate(table):
             if idx == 0: continue
             row[2] = math.log10(row[2]+1)
-            row[3] = math.log10(row[3]+1)        
+            row[3] = math.log10(row[3]+1)
+
+    def transforms_to_log10_2(table):
+        for idx, row in enumerate(table):
+            if idx == 0: continue
+            row[3] = math.log10(row[3])
+
+    ###### Custom functions to process data
+    def get_profile_mean_depth(hpo_profile):
+        hp_terms = hpo_profile.split(",")
+        return float(np.mean([int(hpo_terms_depth[term]) for term in hp_terms]))
 
     ######### get_pubmed_index part preprocessing 
     top_5_no_abstracts = [[row[1], row[3]] for row in plotter.hash_vars["file_raw_stats"][1:6]]
@@ -55,28 +67,20 @@
     plotter.hash_vars["top_5_no_abstracts"][0] = [os.path.basename(file) for file in plotter.hash_vars["top_5_no_abstracts"][0]]
 
     ######### Sentence Transformers' brought papers stats  preprocessing
-    plotter.hash_vars["PMIDs_prevalence"] = [["PREVALENCE"]] + [ [value] for value in list(Counter([row[0] for row in plotter.hash_vars["llm_filtered_scores"]]).values()) ] 
-    plotter.hash_vars["HPOs_prevalence"] = [["PREVALENCE"]] + [ [value] for value in list(Counter([row[1] for row in plotter.hash_vars["llm_filtered_scores"]]).values()) ]
+    hpo_counts = Counter([row[1] for row in plotter.hash_vars["llm_filtered_scores"]])
+    pmid_counts = Counter([row[0] for row in plotter.hash_vars["llm_filtered_scores"]])
+    plotter.hash_vars["PMIDs_prevalence"] = [["PREVALENCE"]] + [ [value] for value in list(pmid_counts.values()) ] 
+    plotter.hash_vars["HPOs_prevalence"] = [["PREVALENCE"]] + [ [value] for value in list(hpo_counts.values()) ]
     plotter.hash_vars["llm_filtered_scores"].insert(0, ["PMID", "HP", "SIM_SCORE"])
     plotter.hash_vars["similitudes"] = [["SIM_SCORE"]] + [[sim] for row in plotter.hash_vars["llm_filtered_scores"][1:] for sim in row[2].split(";") ] 
 
-    ######## LM_vs_MONDO comparisons preprocessing
-    plotter.hash_vars["llm_vs_mondo_semantic_similarity_hpo_based.txt"].insert(
-    0, ["PMID", "similarity", "rankings", "strict_pos", "non_strict_pos", "MONDO", "n_newer_better_papers", "n_older_better_papers"])
+    hpo_terms_depth = dict(plotter.hash_vars["HPO_terms_depth"])
+    hp_counts_vs_hp_depth = [[hp, counts, hpo_terms_depth[hp]] for hp, counts in hpo_counts.items()]
+    plotter.hash_vars["hp_counts_vs_hp_depth"] = [["hp_term", "counts", "term_depth"]] + hp_counts_vs_hp_depth
 
-    for idx,row in enumerate(plotter.hash_vars["llm_vs_mondo_semantic_similarity_hpo_based.txt"]):
-        if idx == 0: row.insert(0, "mock_grouping_factor")
-        else: row.insert(0, f"factor")
+    pmid_nTerms_and_mean_profile_depth = [[PMID, len(profile), get_profile_mean_depth(profile)] for PMID, profile in plotter.hash_vars["llm_pmID_profiles.txt"]]
+    plotter.hash_vars["pmid_nTerms_and_mean_profile_depth"] = [["PMID", "profile_length", "profile_terms_mean_depth"]] + pmid_nTerms_and_mean_profile_depth
 
-    #Preparing data for MONDO vs PMID number of HPOs scatterplot
-    MONDO_nHPOs_cleaned_dict = {key: len(value.split(",")) for key,value in dict(plotter.hash_vars['MONDO_HPOs_cleaned']).items()}
-    stEngine_nHPOs_dict = {key: len(value.split(",")) for key,value in dict(plotter.hash_vars['llm_pmID_profiles.txt']).items()}    
-    plotter.hash_vars["MONDO_nHPO_vs_PMDID_nHPO"] = [["Index", "MONDO_nHPOs", "PMID_nHPOs", "similarity"]]
-    plotter.hash_vars["MONDO_nHPO_vs_PMDID_nHPO"] += [[idx, MONDO_nHPOs_cleaned_dict[row[6]], stEngine_nHPOs_dict[row[1].replace('PMID:', '')], row[2]] 
-        for idx, row in enumerate(plotter.hash_vars["llm_vs_mondo_semantic_similarity_hpo_based.txt"][1:])]
-
-    n_records_dict=dict(plotter.hash_vars["number_of_records.txt"])
-    n_records_dict={key:int(value) for key,value in n_records_dict.items()}    
 %>
 <% plotter.set_header() %>
 
@@ -88,71 +92,248 @@ ${ plotter.create_title('Pubmed Abstract extraction and preprocessing', id='sect
     section1 =  plotter.pie(id="total_stats", header=True, row_names= True, transpose = True, fields = [0,2,3,4], func=process_pie_data,  
                                 title="Pubmed articles stats") + "\n"
     section1 += plotter.density(id="file_proportion_stats", header=True, row_names= True, fields=[0,2], 
-                                title="Distribution of proportion of articles without abstract \n among all (original) files downloaded from PubMed") + "\n"
+                                config = {"yAxisTitle": "File number", "xAxisTitle": "Missing abstracts proportion"},
+                                title="Distribution of missing abstracts inside original files downloaded from PubMed") + "\n"
 %>
 <div style="overflow: hidden; display: flex; flex-direction: row; justify-content: center;">
-${ plotter.create_collapsable_container('section1_to', section1) }
+${ plotter.create_collapsable_container('section1_to', section1, display='visible') }
 </div>
 
 
 
+<% 
+    def plot_hexplot_without_marginals_1(data, plotter_list):
+        g = plotter_list["sns"].jointplot(data=data, x="term_depth", y="counts", kind="hex")
+        g.ax_marg_x.remove()
+        g.ax_marg_y.remove()
 
+    def plot_hexplot_without_marginals_2(data, plotter_list):
+        g = plotter_list["sns"].jointplot(data=data, x="profile_length", y="profile_terms_mean_depth", kind="hex")
+        g.ax_marg_x.remove()
+        g.ax_marg_y.remove()
+
+    def clean_num(num):
+        return num.replace(".", "").replace("c", "")
+
+    papers_drawn_by_the_model = set(dict(plotter.hash_vars['llm_pmID_profiles.txt']).keys())
+    published_years = [["year", "pmid"]] + [ [int(clean_num(row[2])), row[0]] for row in plotter.hash_vars["pubmed_metadata"][1:] 
+                                                if row[2] != "0" and int(clean_num(row[2])) <= 2024 and int(clean_num(row[2])) > 1980 
+                                                and row[0] in papers_drawn_by_the_model]
+    plotter.hash_vars["published_years"] = published_years
+
+%>
 ${ plotter.create_title("Sentence Transformers Model's brought paper stats", id='section2_from', hlevel=1, indexable=True, clickable=True, t_id='section2_to', clickable_text = '(Click me)') }
 <%
-    section2 =  plotter.static_plot_main(id="similitudes", width = 800, height = 800, header=True, row_names= False, fields=[0], rezisable=True,
-                                        title="General distribution of semantic scores", x_label = "Semantic Score", y_label = "Number of Abstract-HP term relations",
-                                        plotting_function=  lambda data, plotter_list: plotter_list["plt"].hist(data, bins=60) ) + "\n"
-    section2 += plotter.static_plot_main(id="PMIDs_prevalence", width = 800, height = 800, header=True, row_names= False, fields=[0], rezisable=True,
-                                        title="Prevalence distribution of PMIDs abstracts", y_label = "Number of Articles", x_label = "Number of HPs found inside the article's abstract", 
-                                        plotting_function=  lambda data, plotter_list: plotter_list["plt"].hist(data, bins=30, range=(0, 30)) ) + "\n"
-    section2 += plotter.static_plot_main(id="HPOs_prevalence", width = 800, height = 800, header=True, row_names= False, fields=[0], rezisable=True,
-                                        title="Prevalence distribution of terms of the HPO", y_label = "Number of HPs", x_label = "Number of abstracts found with the HP", 
-                                        plotting_function=  lambda data, plotter_list: plotter_list["plt"].hist(data, bins=60, range=(0, 3000))  ) + "\n"
+    section2 = '<div style="overflow: hidden; display: flex; flex-direction: row; justify-content: center;">' + "\n"
+    section2 +=  plotter.static_plot_main(id="published_years", width = 400, height = 800, header=True, row_names= False, fields=[0], rezisable=False,
+                                        title="Publication year", x_label = "Year", y_label = "",
+                                        plotting_function=  lambda data, plotter_list: plotter_list["sns"].boxplot(data=data, y="year"),
+                                        img_attribs=f"width=31% height=45%" ) + "\n"
+    section2 +=  plotter.static_plot_main(id="similitudes", width = 400, height = 800, header=True, row_names= False, fields=[0], rezisable=False,
+                                        title="Distribution of semantic scores", x_label = "Semantic Score", y_label = "Number of Abstract-HP term relations",
+                                        plotting_function=  lambda data, plotter_list: plotter_list["sns"].boxplot(data=data, y="SIM_SCORE", showfliers=False),
+                                        img_attribs=f"width=31% height=45%" ) + "\n"
+    section2 += plotter.static_plot_main(id="PMIDs_prevalence", width = 400, height = 800, header=True, row_names= False, fields=[0], rezisable=False,
+                                        title="Distribution of abstract HP annotations", y_label = "Counts", x_label = "HP number per abstract", 
+                                        plotting_function=  lambda data, plotter_list: plotter_list["sns"].boxplot(data=data, y="PREVALENCE", showfliers=False),
+                                        img_attribs=f"width=31% height=45%" ) + "\n"
+    section2 += plotter.static_plot_main(id="HPOs_prevalence", width = 400, height = 800, header=True, row_names= False, fields=[0], rezisable=False,
+                                        title="Distribution of HP annotations", y_label = "Counts", x_label = "Abstracts per HP", 
+                                        plotting_function=  lambda data, plotter_list: plotter_list["sns"].boxplot(data=data, y="PREVALENCE", showfliers=False),
+                                        img_attribs=f"width=31% height=45%"  ) + "\n"
+    section2 += "</div>" + "\n"
+    
+    section2 += plotter.create_title("Supplementary Data", id='section2_supp_from', hlevel=2, indexable=False, clickable=True, t_id='section2_supp_to', clickable_text = '(Click me)')
+    section2_sup = plotter.static_plot_main(id=f"hp_counts_vs_hp_depth", header=True, row_names=True, 
+                                        plotting_function=  plot_hexplot_without_marginals_1,
+                                        title=f"Number of times that a HP term was found in a paper \nvs the HP term depth in the ontology",        
+                                        x_label=f"Term's depth in the HPO", y_label=f"Number of times found in papers", rezisable=False,
+                                        width = 800, height = 800, img_properties=r"width=45% height=60%") + "\n"
+    section2_sup += plotter.static_plot_main(id=f"pmid_nTerms_and_mean_profile_depth", header=True, row_names=True,
+                                        plotting_function=  plot_hexplot_without_marginals_2,     
+                                        title=f"Abstract-HPO profile size vs terms mean depth", rezisable=False,
+                                        x_label=f"Size of the Abstract HPO profile", y_label=f"Mean depth of the HP terms inside the profile",
+                                        width = 800, height = 800, img_properties=r"width=45% height=60%") + "\n"                                    
+    section2 += plotter.create_collapsable_container('section2_supp_to', section2_sup, display='hidden')
 %>
-<div style="overflow: hidden; display: flex; flex-direction: row; justify-content: center;">
-${ plotter.create_collapsable_container('section2_to', section2) }
-</div>
+${ plotter.create_collapsable_container('section2_to', section2, display='visible') }
 
 
 
+<% 
+gold = plotter.hash_vars["gold_filename_prefix.txt"][0][0]
+pretty_names={"mondo": "MONDO", "omim": "OMIM-DO", "omim2": "Monogenic OMIM"} 
 
+######## LM_vs_MONDO comparisons preprocessing
 
-${ plotter.create_title("Model assessment against MONDO gold standard", id='section3_from', hlevel=1, indexable=True, clickable=True, t_id='section3_to', clickable_text = '(Click me)') }
+###Preparing table stats
+n_diseases = len(plotter.hash_vars[f"{gold}_PMIDs_cleaned"])
+non_unique_pmids = [row[1].split(",") for row in plotter.hash_vars[f"{gold}_PMIDs_cleaned"]]
+non_unique_pmids = flatten(non_unique_pmids)#[item for row in non_unique_pmids for item in row]
+unique_pmids = list(set(non_unique_pmids))
+unique_pmids_ratio = round(len(set(non_unique_pmids)) / len(non_unique_pmids), 2)
+number_of_each_pmid = Counter(non_unique_pmids)
+non_repeated_pmids = [ repeats for pmid, repeats in number_of_each_pmid.items() if repeats == 1 ]
+repeated_pmids = [ repeats for pmid, repeats in number_of_each_pmid.items() if repeats > 1 ]
+
+mean_pmids_per_mondo = round(len(non_unique_pmids) / len(plotter.hash_vars[f"{gold}_PMIDs_cleaned"]),2)
+n_repeated_pmids = len(repeated_pmids)
+mean_repeats = round(np.mean(repeated_pmids),2)
+
+mondo_stats = [
+    ["Stat", "Value"],
+    [f"Number of diseases being tested", n_diseases],
+    [f"Number of total PMIDs", len(non_unique_pmids)],
+    [f"Number of unique PMIDs", len(unique_pmids)],
+    [f"Unique PMIDs proportion", unique_pmids_ratio],
+    [f"Average number of PMIDs per disease",  str(mean_pmids_per_mondo)],
+    [f"PMIDs in only one disease", len(non_repeated_pmids)],
+    [f"PMIDs in more than one disease", len(repeated_pmids)],
+    [f"Mean repetitions of repeated PMIDs", str(mean_repeats)]
+]
+
+plotter.hash_vars[f"{gold}_PMIDs_stats"] = copy.deepcopy(mondo_stats)
+
+###Preparing boxplots of similarities and rankings for all MONDO-PMID filtered combinations
+plotter.hash_vars[f"llm_vs_{gold}_semantic_similarity_hpo_based.txt"].insert(
+0, ["PMID", "similarity", "rankings", "strict_pos", "non_strict_pos", gold.upper(), "n_newer_better_papers", "n_older_better_papers", "repeats"])
+
+PMID_MONDOS_aggregated = defaultdict(lambda: {}) #This is used for the next section of boxplots
+for idx,row in enumerate(plotter.hash_vars[f"llm_vs_{gold}_semantic_similarity_hpo_based.txt"]):
+    if idx == 0: row.insert(0, "mock_grouping_factor")
+    else: 
+        PMID_MONDOS_aggregated[row[0]][row[5]] = [row[1], row[2]] #PMID_MONDOS_aggregated["PMID:3"]["MONDO:4"] = [sim, ranking] #This is used for the next section of boxplots
+        row.insert(0, f"factor")
+
+###Preparing boxplot of similarities and rakings for best picks of MONDO-PMIDs
+best_picked_table = [["mock_grouping_factor", "PMID", "similarity", "rankings", gold.upper()]]
+for PMID, MONDOS in PMID_MONDOS_aggregated.items():
+    MONDOS_and_sims_ranks = sorted(list(MONDOS.items()), key=lambda mondo_and_sim_rank: float(mondo_and_sim_rank[1][0]), reverse=True)
+    best_MONDO_pick_name = MONDOS_and_sims_ranks[0][0]
+    sim, rank = MONDOS_and_sims_ranks[0][1]
+    best_picked_table.append(["factor", PMID, sim, rank, best_MONDO_pick_name])
+plotter.hash_vars[f"best_picked_table_{gold}"] = copy.deepcopy(best_picked_table)
+
+### Boxplots together
+semantic_scores = [["value", "score", "type"]]
+semantic_scores += [ [row[2], "similarity", "raw"] for row in plotter.hash_vars[f"llm_vs_{gold}_semantic_similarity_hpo_based.txt"][1:] ]
+semantic_scores += [ [row[3], "ranking", "raw"] for row in plotter.hash_vars[f"llm_vs_{gold}_semantic_similarity_hpo_based.txt"][1:] ]
+
+semantic_scores += [ [row[2], "similarity", "best_pick"] for row in best_picked_table[1:] ]
+semantic_scores += [ [row[3], "ranking", "best_pick"] for row in best_picked_table[1:] ]
+plotter.hash_vars["semantic_scores_grouped"] = copy.deepcopy(semantic_scores)
+
+###Preparing data for MONDO vs PMID number of HPOs scatterplot
+MONDO_nHPOs_cleaned_dict = {key: len(value.split(",")) for key,value in dict(plotter.hash_vars[f'{gold}_HPOs_cleaned']).items()}
+stEngine_nHPOs_dict = {key: len(value.split(",")) for key,value in dict(plotter.hash_vars['llm_pmID_profiles.txt']).items()}    
+plotter.hash_vars[f"{gold}_nHPO_vs_PMDID_nHPO"] = [["Index", f"{gold.upper()}_nHPOs", "PMID_nHPOs", "similarity", "repeats"]]
+plotter.hash_vars[f"{gold}_nHPO_vs_PMDID_nHPO"] += [[idx, MONDO_nHPOs_cleaned_dict[row[6]], stEngine_nHPOs_dict[row[1].replace('PMID:', '')], row[2], row[9]] 
+    for idx, row in enumerate(plotter.hash_vars[f"llm_vs_{gold}_semantic_similarity_hpo_based.txt"][1:])]
+
+n_records_dict=dict(plotter.hash_vars[f"number_of_records_{gold}.txt"])
+n_records_dict={key:int(value) for key,value in n_records_dict.items()}
+
+###Rankings and similitudes versus PMID-HPO profile lenght    
+plotter.hash_vars["rankings_sims_and_nHPOs"] = [
+    ["pmid", "similarity", "rankings", "length_of_profile", "repeats"]] + [
+    [row[1], row[2], row[3], stEngine_nHPOs_dict[row[1].replace("PMID:","")], row[9]] for row in plotter.hash_vars[f"llm_vs_{gold}_semantic_similarity_hpo_based.txt"][1:]]
+
+%>
+
+${ plotter.create_title(f"Gold Standard: {pretty_names[gold]}", id=f'{gold}_from', hlevel=1, indexable=True, clickable=True, t_id=f'{gold}_to', clickable_text = '(Click me)') }
+
+<div class="container" style="width: 100%">
 <%
-    section3 = embedd_venn(sets_raw = (n_records_dict["mondo_pmid_profiles"], n_records_dict["mondo_hpo_profiles"], n_records_dict["mondos_with_pmid_and_hpo"]), 
-                            labels = ('MONDOS with PMID profiles', 'MONDOS with HPO profiles'),
-                            plotter = plotter, idd= "venn1") + "\n"
-
-    section3 += embedd_venn(sets_raw = (n_records_dict["llm_pmid_profiles"], n_records_dict["mondos_with_pmid_and_hpo"], n_records_dict["llm_and_mondo_with_pmid_and_hpo"]), 
-                            labels = ('PMID-HPO profiles \n brought by model', 'MONDOS with PMID and HPO profiles'),
-                            plotter = plotter, idd= "venn2") + "\n"      
-
-    section3 += '<div style="width: 100vw; height: 5vh; background-color: LightGray"></div>' + "\n"    
-    #section3 += plotter.barplot(id="number_of_records.txt", translate=True, header=False, row_names=True, title="Other stats", func=remove_other_stats) + "\n"
-
-    section3 += plotter.boxplot( id="llm_vs_mondo_semantic_similarity_hpo_based.txt", x_label="Rankings", fields=[0,3], header=True, row_names=True,
-                                title="Model's brought PMIDs vs MONDO rankings from profile comparison (semantic similarity between HPO profiles)" , 
+    section3 = '<div class="row"><div class="col-12">' + "\n"
+    section3 += embedd_venn(sets_raw = (n_records_dict[f"{gold}_pmid_profiles"], n_records_dict[f"{gold}_hpo_profiles"], n_records_dict[f"{gold}_with_pmid_and_hpo"]), 
+                            labels = (f'at least 1 abstract', f'at least 1 HP'),
+                            plotter = plotter, idd= f"{gold}_venn1", title="Diseases original data") + "\n"
+    section3 += embedd_venn(sets_raw = (n_records_dict["llm_pmid_profiles"], n_records_dict[f"{gold}_with_pmid_and_hpo"], n_records_dict[f"llm_and_{gold}_with_pmid_and_hpo"]), 
+                            labels = (f'from diseases', 'from HP-model annotation'),
+                            plotter = plotter, idd= f"{gold}_venn2", title="Abstracts intersected with diseases") + "\n"
+    section3 += '</div></div>' + "\n"
+    section3 += '<div class="row"><div class="col-12">' + "\n"
+    section3 += plotter.table(id=f"{gold}_PMIDs_stats", header=True, text=True, styled='bs', attrib = {'class' : 'table table-striped'})
+    section3 += '</div></div>' + "\n"
+    section3 += '<div class="row"><div class="col-6">' + "\n"
+    section3 += plotter.boxplot( id=f"semantic_scores_grouped", smp_attr=[1,2], header=True, row_names=False, x_label="",
+                                group = ["type", "score"],
+                                title="PMIDs Abstracts vs Disease, semantic similarity between HP profiles", 
                                 config= { "graphOrientation": "vertical"}, 
                                 width = 800, height = 800) + "\n"
-    
-    section3 += plotter.scatter2D(id="MONDO_nHPO_vs_PMDID_nHPO", header=True, row_names=True, title="Number of HP terms in a MONDO ID vs HP terms \n brought by model to the MONDO related PMIDs",
-                                colorScaleBy="similarity", xAxis=["MONDO_nHPOs"], yAxis=["PMID_nHPOs"], x_label="Number of MONDO HPs", y_label="Number of HP brought by model to the MONDO-related PMID",
+    section3 += '</div><div class="col-6">' + "\n"        
+    section3 += plotter.scatter2D(id=f"{gold}_nHPO_vs_PMDID_nHPO", header=True, row_names=True, title=f"HP profile size",
+                                colorScaleBy="similarity", xAxis=[f"{gold.upper()}_nHPOs"], yAxis=["PMID_nHPOs"], 
+                                x_label=f"HP number per disease", y_label=f"HP number per abstract",
                                 add_densities=True, alpha=0.6, config={"objectBorderColor": "white", "dataPointSize": 6},
                                 width = 800, height = 800) + "\n"
-
-    section3 += plotter.scatter2D( id="llm_vs_mondo_semantic_similarity_hpo_based.txt", alpha = 0.5,
+    section3 += '</div></div>' + "\n"
+    section3 += '<div class="row"><div class="col-6">' + "\n"
+    section3 += plotter.scatter2D( id=f"llm_vs_{gold}_semantic_similarity_hpo_based.txt", alpha = 0.5,
                                 fields=[1,2,7,8], header=True, row_names=True, x_label="Newer papers", y_label="Older papers",
                                 xAxis=["n_newer_better_papers"], yAxis=["n_older_better_papers"], colorScaleBy="similarity",
-                                title="Number of newer and older papers of the PMIDs \n better than the MONDO gold standard one",
+                                title=f"Abstracts ranked higher than reference disease paper",
+                                add_densities=True, config={"objectBorderColor": "white", "dataPointSize": 6},
                                 width = 800, height = 800) + "\n"
-    
-    section3 += plotter.scatter2D( id="llm_vs_mondo_semantic_similarity_hpo_based.txt", alpha = 0.5, func=transform_to_percentages,
+    section3 += '</div><div class="col-6">' + "\n"        
+    section3 += plotter.scatter2D( id=f"llm_vs_{gold}_semantic_similarity_hpo_based.txt", alpha = 0.5, func=transforms_to_log10,
                                 fields=[1,2,7,8], header=True, row_names=True, x_label="log10(Newer papers)", y_label="log10(Older papers)", 
                                 xAxis=["n_newer_better_papers"], yAxis=["n_older_better_papers"], colorScaleBy="similarity",
-                                title="Number of newer and older papers of the PMIDs \n better than the MONDO gold standard one",
+                                title=f"Abstracts ranked higher than reference disease paper",
+                                add_densities=True, config={"objectBorderColor": "white", "dataPointSize": 6},
                                 width = 800, height = 800) + "\n"
+    section3 += '</div></div>' + "\n"
+    section3 += '<div class="row"><div class="col-12">' + "\n"
+    section3 += plotter.scatter2D( id="rankings_sims_and_nHPOs", alpha = 0.5, header=True, row_names=True,
+                                x_label=" HP number for abstracts disease related", y_label="similarity", 
+                                xAxis=["length_of_profile"], yAxis=["similarity"], colorScaleBy="rankings",
+                                title=f"Ranking characterization",
+                                add_densities=True, 
+                                config={ 
+                                    "objectBorderColor": "white",  
+                                    "dataPointSize": 6,
+                                    "colorSpectrum": ["rgb(165,0,38)","rgb(215,48,39)","rgb(244,109,67)","rgb(253,174,97)","rgb(254,224,144)","rgb(224,243,248)","rgb(171,217,233)","rgb(116,173,209)","rgb(69,117,180)","rgb(49,54,149)"]},
+                                width = 800, height = 800) + "\n"       
+    section3 += '</div></div>' + "\n"
+    section3 += '<div class="row"><div class="col-12">' + "\n"
 
+    section3 += plotter.create_title("Supplementary Data", id=f'{gold}_supp_from', hlevel=2, indexable=False, clickable=True, t_id=f'{gold}_supp_to', clickable_text = '(Click me)')
+    section3_sup = plotter.scatter2D(id=f"{gold}_nHPO_vs_PMDID_nHPO", header=True, row_names=True, title=f"Number of HP terms in a {gold.upper()} ID vs HP terms \n brought by model to the {gold.upper()} related PMIDs",
+                                colorScaleBy="repeats", xAxis=[f"{gold.upper()}_nHPOs"], yAxis=["PMID_nHPOs"], x_label=f"Number of {gold.upper()} HPs", y_label=f"Number of HP brought by model to the {gold.upper()}-related PMID",
+                                add_densities=True, alpha=0.6, config={"objectBorderColor": "white", "dataPointSize": 6},
+                                width = 800, height = 800) + "\n"
+    section3_sup += plotter.scatter2D( id=f"llm_vs_{gold}_semantic_similarity_hpo_based.txt", alpha = 0.5,
+                                fields=[1,2,3,9], header=True, row_names=True, x_label="similarity", y_label="repeats",
+                                xAxis=["similarity"], yAxis=["repeats"], colorScaleBy="rankings",
+                                title=f"Number of other PMIDs with the same score than gold standard vs similarity",
+                                add_densities=True, config={"objectBorderColor": "white", "dataPointSize": 6},
+                                width = 800, height = 800) + "\n"                                    
+    section3_sup += plotter.scatter2D( id="rankings_sims_and_nHPOs", alpha = 0.5, header=True, row_names=True, 
+                                x_label="Length of PMID-HPOs profile", y_label="Ranking", 
+                                xAxis=["length_of_profile"], yAxis=["ranking"], colorScaleBy="similarity",
+                                title=f"Comparison of the PMID associated HPO profile lenght vs rankings \n and similarity obtained against {gold} goldstandard",
+                                add_densities=True, config={"objectBorderColor": "white", "dataPointSize": 6},
+                                width = 800, height = 800) + "\n"  
+    section3_sup += plotter.scatter2D( id="rankings_sims_and_nHPOs", alpha = 0.5, header=True, row_names=True, func=transforms_to_log10_2,
+                                x_label="similarity", y_label="ranking", 
+                                xAxis=["similarity"], yAxis=["ranking"], colorScaleBy="length_of_profile",
+                                title=f"Comparison of the PMID associated HPO profile lenght vs rankings \n and similarity obtained against {gold} goldstandard",
+                                add_densities=True, config={"objectBorderColor": "white", "dataPointSize": 6},
+                                width = 800, height = 800) + "\n"          
+    section3_sup += plotter.scatter2D( id="rankings_sims_and_nHPOs", alpha = 0.5, header=True, row_names=True, 
+                                x_label="length_of_profile", y_label="repeats", 
+                                xAxis=["length_of_profile"], yAxis=["repeats"], colorScaleBy="rankings",
+                                title=f"Gold PMID profile length vs numbers of PMIDs with the same score than goldstandard",
+                                add_densities=True, config={"objectBorderColor": "white", "dataPointSize": 6},
+                                width = 800, height = 800) + "\n"
+    section3_sup += plotter.scatter2D( id="rankings_sims_and_nHPOs", alpha = 0.5, header=True, row_names=True, 
+                                x_label="length_of_profile", y_label="repeats", 
+                                xAxis=["length_of_profile"], yAxis=["repeats"], colorScaleBy="similarity",
+                                title=f"Gold PMID profile length vs numbers of PMIDs with the same score than goldstandard",
+                                add_densities=True, config={"objectBorderColor": "white", "dataPointSize": 6},
+                                width = 800, height = 800) + "\n"                                       
+    section3 += plotter.create_collapsable_container(f'{gold}_supp_to', section3_sup, display='hidden')
+    section3 += '</div></div>' + "\n"      
 %>
-<div style="overflow: hidden; display: flex; flex-direction: row; justify-content: center;">
-${ plotter.create_collapsable_container('section3_to', section3) }
+${ plotter.create_collapsable_container(f'{gold}_to', section3, display='visible') }
 </div>

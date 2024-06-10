@@ -4,6 +4,7 @@ source $PYENV/bin/activate
 for ID in $database_ids
 do
 	grep $ID $TMP_PATH/phenotype.hpoa | grep -v description | cut -f 1,4 | sort -u > $TMP_PATH/$ID'_filtered_HP'
+	semtools -i $TMP_PATH/$ID'_filtered_HP' -O HPO -o $TMP_PATH/$ID -c -T "HP:0000118" --2cols --out2cols
     #### TRANSLATED ####
 	pattern=$ID
 	if [ "$ID" == "ORPHA" ];then
@@ -20,4 +21,6 @@ cat $TMP_PATH/OMIM2MONDO_raw $TMP_PATH/ORPHA2MONDO_raw > $TMP_PATH/MERGED2MONDO_
 sort -u $TMP_PATH/MERGED2MONDO_raw > $TMP_PATH/MERGED2MONDO_filtered_HP
 #semtools -i $TMP_PATH/MERGED2MONDO_filtered_HP -O HPO -o $TMP_PATH/MERGED2MONDO -T "HP:0000118" --2cols --out2cols -c # Clean redundant HPO and childs not in phenotopyc abnormality
 semtools -i $TMP_PATH/MERGED2MONDO_filtered_HP -O HPO -o $TMP_PATH/MERGED2MONDO -c -T "HP:0000118" --2cols --out2cols # Clean childs not in phenotopyc abnormality
+
 aggregate_column_data -i $TMP_PATH/MERGED2MONDO -x 1 -a 2 > $INPUTS_PATH/mondo_hpo_profiles.txt
+aggregate_column_data -i $TMP_PATH/OMIM -x 1 -a 2 > $INPUTS_PATH/omim_hpo_profiles.txt

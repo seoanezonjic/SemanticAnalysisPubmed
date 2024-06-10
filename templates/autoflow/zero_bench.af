@@ -1,0 +1,60 @@
+get_goldstandard_PMIDs_and_OMIMIDs){
+    . ~soft_bio_267/initializes/init_python
+    export PATH=$code_path:$PATH #TODO: Remove later
+    ?
+    join_gs_common_omim_pmids --omim1_file $omim --omim2_file $omim2 -o joined_omims.txt
+    cut -f 1 > gs_unique_OMIM_ids
+    cut -f 2 | tr "," "\n" | sort -u > gs_unique_PMIDs
+}
+
+filter_query){
+    ?
+    grep -f get_goldstandard_PMIDs_and_OMIMIDs)"/gs_unique_OMIM_ids" $queries | gzip > filtered_queries.gz
+}
+
+get_and_filter_abstracts){
+	resources: -n cal -c 50 -t '0-10:00:00' -m '400gb'
+	. ~soft_bio_267/initializes/init_python
+
+	export PATH=$code_path:$PATH #TODO: Remove later
+	source $pyenv/bin/activate #TODO: Remove later
+	
+	n_cpus=$(([cpu] - 3))
+	mkdir indexes
+	?
+	get_pubmed_index -i "$pubmed_path/*" -o indexes -t "pubmed_" -k $pubmed_chunksize -c $n_cpus -d $splitted $paper $equivalences
+    zcat indexes/*.gz | grep -f get_goldstandard_PMIDs_and_OMIMIDs)"/gs_unique_PMIDs" | gzip > filtered_corpus.gz
+}
+
+
+query_abstracts){
+    resources: -n dgx -c 120 -t '6-00:00:00' -m '360gb' -A exclude=exa01;$n_gpus
+	. ~soft_bio_267/initializes/init_python
+	export PATH=$code_path:$PATH #TODO: Remove later
+	source $pyenv/bin/activate #TODO: Remove later
+	export MKL_NUM_THREADS=$(([cpu] - 3)) #Pytorch option for CPU
+	export OMP_NUM_THREADS=$(([cpu] - 3)) #Pytorch option for CPU
+
+	gpu_csv=`echo $gpu_devices | tr '-' ','`
+	echo "using gpu devices: $gpu_csv"
+
+	mkdir semantic_scores
+	query_basename=`basename $queries`
+    n_corpus=`zcat get_and_filter_abstracts)"/filtered_corpus.gz" | wc -l B | cut -f 1 -d " "`
+	?
+	stEngine -m $model_name -p $current_model \
+             -c get_and_filter_abstracts)"/filtered_corpus.gz" \
+             -q filter_query)"/filtered_queries.gz" \
+             -k $n_corpus -t "-1" -o semantic_scores \
+             -g $gpu_csv $splitted -v $use_gpu_for_sim_calc
+
+	if [[ ! -s semantic_scores/$query_basename ]]; then exit 1; fi #exit if no results
+	awk '{print $2 "\t" $1 "\t" $3 }' semantic_scores/$query_basename > rankings
+
+}
+
+rank_diseases){
+    ?
+    collapse_same_HPs_inside_of_splitted_abstract.py -i query_abstracts)"/rankings" -o rankings
+    cut -f 1 query_abstracts)"/rankings" | sort -u |
+}
