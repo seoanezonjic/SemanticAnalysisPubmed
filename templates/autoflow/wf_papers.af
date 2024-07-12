@@ -58,7 +58,7 @@ query_abstracts_[$folders_to_parallelize]){
 }
 
 aggregate_results){
-	resources: -n cal -c 4 -m 100G -t '0-10:00:00'
+	resources: -n cal -c 4 -m '500gb' -t '1-12:00:00'
 	. ~soft_bio_267/initializes/init_python	
 	query_basename=`basename $queries`
 	?

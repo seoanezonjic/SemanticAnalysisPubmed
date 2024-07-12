@@ -6,3 +6,4 @@ tmp/
 previous_results/
 debug/
 workflow_paths
+runs/

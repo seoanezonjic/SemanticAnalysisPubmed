@@ -73,7 +73,7 @@ ranker_like_table = get_rank_metrics(sims, pmIDs, "best") #30972193   0.11771798
 table_articles_years = [article_years_dict[record[0]] for record in ranker_like_table if article_years_dict.get(record[0])] #TODO: fix it and changed to previous version
 
 repeated_positions = Counter([row[-1] for row in ranker_like_table])
-with open(options['output_file'], 'a') as f:
+with open(options['output_file'], 'w') as f:
     year_index = 0
     repeated_score = 0
     old_pos = ranker_like_table[0][3]

@@ -1,0 +1,67 @@
+<%
+    import numpy as np
+    import copy
+    import warnings
+
+    def plot_area(data, plotter_list):
+        x = data["pos"]
+        y = data["dist"]
+        plotter_list["plt"].xlabel("normalized ranking")
+        plotter_list["plt"].ylabel("cumulative distribution")
+        plotter_list["plt"].fill_between(x,y)
+
+    def plot_precision_recall(data, plotter_list):
+        plotter_list["plt"].xlim(0, 1)
+        plotter_list["plt"].ylim(0, 1)
+        plotter_list["sns"].lineplot(data=data,x="rec",y="prec")
+
+    def plot_roc(data, plotter_list):
+        #plotter_list["plt"].xlim(0, 1)
+        #plotter_list["plt"].ylim(0, 1)
+        plotter_list["plt"].xlabel("False Positive Rate")        
+        plotter_list["plt"].ylabel("True Positive Rate")
+        plotter_list["sns"].lineplot(data=data,x="fpr",y="tpr")        
+
+    #"PMID:1115799	0.49847549200057983	0.0027241208519068845	11	11	OMIM:604131"
+
+    abs_rankings = np.array( sorted([int(row[3]) for row in plotter.hash_vars["filtered_rankings"]]) )
+    cumms = [ np.mean(abs_rankings <= pos) for pos in range(1, len(abs_rankings)+1)]
+    norm_pos = np.array(range(1, len(cumms)+1)) / len(cumms)
+    abs_pos = [f"top{k}" for k in list(range(1, len(cumms)+1))]
+
+    plotter.hash_vars["cumm_dist"] = [["abs", "pos", "dist"]] + [list(pair) for pair in zip(abs_pos, norm_pos, cumms)]
+    plotter.hash_vars["selected_tops"] = [[plotter.hash_vars["cumm_dist"][row_idx][0], 
+                                            plotter.hash_vars["cumm_dist"][row_idx][2]] 
+                                            for row_idx in [0,1,2,5,10]]
+
+
+    plotter.hash_vars["filtered_rankings"].insert(0, ["factor", "PMID", "score", "normalized", "strict", "nonstrict", "OMIM", "is_gs"]) 
+    for row in plotter.hash_vars["filtered_rankings"][1:]: row.insert(0, "rankings")
+
+
+    stEngine_ROC_measures = plotter.hash_vars["stEngine_ROC_measures"] 
+    sample_indexes = np.concatenate([np.array([0]), np.round(np.linspace(1,len(stEngine_ROC_measures)-1, 3000))]) #FIRST VALUE (APART FROM COLNAMES) SHOULD BE VALUEABLE TO ADD TO EVENLY SAMPLED ROC DATA
+    sampled_roc = [stEngine_ROC_measures[idx] for idx in np.int32(sample_indexes)]
+    #sampled_roc.insert(1, ['stEngine',"1","1","0","0","1","0"])
+    plotter.hash_vars["sampled_roc"] = sampled_roc
+%>
+
+<h1> Number of diseases analyzed: ${len(plotter.hash_vars["filtered_rankings"])} </h1>
+<div style="overflow: hidden; display: flex; flex-direction: row; justify-content: center;">
+
+    ${plotter.boxplot(id="filtered_rankings", header=True, row_names=True, fields=[0,3], title="Normalized rankings distribution", x_label="",
+                        config= { "graphOrientation": "vertical"},
+    )}
+
+    ${plotter.barplot(id="selected_tops", header=True, row_names=True, transpose=True, title="Top-K True Positive Rate", x_label="True Positive Rate",
+                        config= { "graphOrientation": "vertical", "setMinX": 0, "setMaxX": 1},
+    )}
+</div>
+<div style="overflow: hidden; display: flex; flex-direction: row; justify-content: center;">
+    ${plotter.static_plot_main(id="cumm_dist", header=True, row_names=True, plotting_function=plot_area)}
+
+    ${plotter.static_plot_main(id="sampled_roc", header=True, row_names=False, smp_attr=[0], plotting_function=plot_roc )}
+
+    ${plotter.static_plot_main(id="sampled_roc", header=True, row_names=False, smp_attr=[0], plotting_function=plot_precision_recall )}
+
+</div>

@@ -10,7 +10,7 @@ import argparse, os
 def read_and_load_omim_pmids(file_path, omim_dict):
 	with open(file_path) as f:
 		for line in f:
-			omimID, PMIDs = line.split("\t")
+			omimID, PMIDs = line.strip().split("\t")
 			PMIDS_list = PMIDs.split(",")
 			omim_dict[omimID].extend(PMIDS_list)
 
@@ -38,7 +38,7 @@ options = vars(opts)
 omim_dict = defaultdict(list)
 
 read_and_load_omim_pmids(options["omim1_file"], omim_dict)
-read_and_load_omim_pmids(options["omim1_file2"], omim_dict)
+read_and_load_omim_pmids(options["omim2_file"], omim_dict)
 
 with open(options["output_file"], "w") as f:
 	for omimID, pmID in omim_dict.items():

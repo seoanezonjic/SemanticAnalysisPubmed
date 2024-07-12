@@ -21,6 +21,7 @@ export OMIM_QUERY_INPUT_DATA="/mnt/home/users/bio_267_uma/federogc/projects/Grap
 export PYENV=$HOME/py_venvs/llm_env #TODO: Remove later
 export PATH=$CODE_PATH:$PATH
 
+export PUBMED_CHUNKSIZE_FILT=100
 ################### RUN SPECIFIC PATHS
 source $1
 echo "DOING $RUN_NAME RUN"
@@ -33,6 +34,7 @@ export PUBMED_FILES_STATS_PATH=$RESULTS_PATH/abstracts_stats_tables
 
 #PATHS TO EXECUTION OF TEMPLATES
 export ENGINE_AUTOFLOW_TEMPLATE_PATH=$AUTOFLOW_TEMPLATES/$ENGINE_AUTOFLOW_TEMPLATE
+
 export ZEROBENCH_EXEC_PATH=$FSCRATCH"/SemanticAnalysisPubmed/$RUN_NAME/EXECS_zerobench"
 export ENGINE_EXEC_PATH=$FSCRATCH"/SemanticAnalysisPubmed/$RUN_NAME/EXECS_engine"
 export PROFILES_EXEC_PATH=$FSCRATCH"/SemanticAnalysisPubmed/$RUN_NAME/EXECS_profiles"
@@ -40,40 +42,14 @@ echo -e "engine_wf\t$ENGINE_EXEC_PATH" > $CURRENT_PATH/workflow_paths
 echo -e "bench_wf\t$PROFILES_EXEC_PATH" >> $CURRENT_PATH/workflow_paths
 echo -e "zerobench_wf\t$ZEROBENCH_EXEC_PATH" >> $CURRENT_PATH/workflow_paths
 
-mkdir -p $ENGINE_EXEC_PATH; mkdir -p $PROFILES_EXEC_PATH
-mkdir -p $RESULTS_PATH; mkdir -p $RESULTS_PATH/reports; mkdir -p $INPUTS_PATH ; mkdir -p $TMP_PATH; mkdir -p $PUBMED_FILES_STATS_PATH; mkdir -p $RUN_INPUTS_PATH
-mkdir -p $AUTOFLOW_TEMPLATES; mkdir -p $REPORTS_TEMPLATES; mkdir -p $QUERIES_PATH ; mkdir -p $TEMPLATES_PATH; mkdir -p $RUN_FOLDER; mkdir -p $RUN_TMP_PATH
+mkdir -p $RESULTS_PATH; mkdir -p $RESULTS_PATH/reports; mkdir -p $RESULTS_PATH/reports/cohort_stEngine; mkdir -p $INPUTS_PATH ; mkdir -p $TMP_PATH; mkdir -p $PUBMED_FILES_STATS_PATH; 
+mkdir -p $AUTOFLOW_TEMPLATES; mkdir -p $REPORTS_TEMPLATES; mkdir -p $QUERIES_PATH ; mkdir -p $TEMPLATES_PATH; mkdir -p $RUN_FOLDER; mkdir -p $RUN_TMP_PATH; mkdir -p $RUN_INPUTS_PATH
 #OTHER VARIABLES
 export database_ids="OMIM ORPHA"
 
 
 if [ "$2" == "goldstandard" ]; then #DOWNLOAD AND PREPARE GOLD STANDARDS TO ASSESS MODEL PERFORMANCE
-#GS1	######### PREPARING MONDO-PMIDs AND MONDO-HPOs profiles ########
-		#Download MONDO-PUMBED relations and MONDO-HP relations
-		wget https://data.monarchinitiative.org/latest/tsv/all_associations/publication_disease.all.tsv.gz -O $TMP_PATH/publication_disease.all.tsv.gz
-		wget http://purl.obolibrary.org/obo/hp/hpoa/phenotype.hpoa -O $TMP_PATH/phenotype.hpoa
-
-		#Process MONDO-PUMBED relations
-		zcat tmp/publication_disease.all.tsv.gz | tail -n +2 | cut -f 1,5,13 | grep MONDO | grep PMID | grep direct | cut -f 1,2 | sed "s/PMID://g" | \
-				aggregate_column_data -i - -x 2 -a 1 > $INPUTS_PATH/mondo_pubmed_profiles.txt
-		
-		#Process MONDO-HP and OMIM-HP relations
-		prepare_mondo_hp_relations.sh #Outpus to $INPUTS_PATH/mondo_hpo_profiles.txt and $INPUTS_PATH/omim_hpo_profiles.txt
-
-#GS2	######## PREPARING OMIM-PMIDs AND OMIM-HPOs profiles FROM DOID #######
-		semtools -O DO --return_all_terms_with_user_defined_attributes 'id,def,xref' |  grep "OMIM" | grep "pubmed" > $TMP_PATH/DOID_raw_data
-		get_required_fields_from_DO_goldstandard.py -i $TMP_PATH/DOID_raw_data -o $INPUTS_PATH/omim_pubmed_profiles.txt
-		#alredady produced $INPUTS_PATH/omim_hpo_profiles.txt with prepare_mondo_hp_relations.sh script
-
-#GS3	######## PREPARING OMIM-PMIDs AND OMIM-HPOs profiles from the paper found by PSZ  ####### https://pubmed.ncbi.nlm.nih.gov/33947870/
-		wget https://figshare.com/ndownloader/files/25769330 -O $TMP_PATH/omim2.txt
-		tail -n +2 $TMP_PATH/omim2.txt | awk 'BEGIN{IFS="\t";OFS="\t"}{print "OMIM:"$4,$3}' | \
-				aggregate_column_data -i - -x 1 -a 2 > $INPUTS_PATH/omim2_pubmed_profiles.txt		
-		ln -s $INPUTS_PATH/omim_hpo_profiles.txt $INPUTS_PATH/omim2_hpo_profiles.txt
-		
-		#### Downloads PMC-PMID equivalences for some full papers that does not have PMID field
-		wget https://ftp.ncbi.nlm.nih.gov/pub/pmc/PMC-ids.csv.gz -O $TMP_PATH/PMC-ids.csv.gz
-		zcat $TMP_PATH/PMC-ids.csv.gz | cut -d "," -f 9,10 | tail -n +2 | tr "," "\t" | awk '{ if(NF == 2) print $0}' > $INPUTS_PATH/PMC-PMID_equivalencies
+		prepare_all_goldstandards.sh
 
 elif [ "$2" == "download" ] ; then # DOWNLOAD MODEL
 		#Download model
@@ -92,6 +68,7 @@ elif [ "$2" == "queries" ] ; then
 		grep -P "Number Sign|Percent" $OMIM_QUERY_INPUT_DATA | grep -v "#" | cut -f 2,3 | cut -d ";" -f 1 | sed -E "s/([0-6][0-9]{5})/OMIM:\1/g" > $QUERIES_PATH/omim_list
 
 elif [ "$2" == "zerobench_wf" ] ; then
+		mkdir -p $ZEROBENCH_EXEC_PATH
 		source ~soft_bio_267/initializes/init_autoflow
 		variables=`echo -e "
 			\\$code_path=$CODE_PATH,
@@ -100,7 +77,7 @@ elif [ "$2" == "zerobench_wf" ] ; then
 			\\$splitted=$SPLITTED,
 			\\$paper=$PAPER,
 			\\$equivalences=$EQUIVALENCES,
-			\\$queries=$QUERIES_PATH/hpo_list,
+			\\$queries=$QUERIES_PATH/omim_list,
 			\\$pubmed_path=$CORPUS_PATH,
 			\\$pyenv=$PYENV,
 			\\$gpu_devices=$GPU_DEVICES,
@@ -113,12 +90,12 @@ elif [ "$2" == "zerobench_wf" ] ; then
 			\\$pubmed_chunksize=$PUBMED_CHUNKSIZE,
 			\\$results_path=$RESULTS_PATH,
 			\\$report_templates_path=$REPORTS_TEMPLATES,
-			\\$omim=$INPUTS_PATH"/omim_pubmed_profiles.txt",
-			\\$omim2=$INPUTS_PATH"/omim2_pubmed_profiles.txt"			       
+			\\$omim_file=$INPUTS_PATH/$ZEROBENCH_GOLD_STANDARD,			       
 			" | tr -d [:space:]`
-		AutoFlow -e -w $AUTOFLOW_TEMPLATES/zero_bench.af -V $variables -o $ENGINE_EXEC_PATH -m 20gb -t 3-00:00:00 -n cal -c 10 -L $3
+		AutoFlow -e -w $AUTOFLOW_TEMPLATES/zero_bench.af -V $variables -o $ZEROBENCH_EXEC_PATH -m 20gb -t 3-00:00:00 -n cal -c 10 -L $3
 
 elif [ "$2" == "engine_wf" ] ; then
+		mkdir -p $ENGINE_EXEC_PATH; 
 		source ~soft_bio_267/initializes/init_autoflow
 		variables=`echo -e "
 			\\$code_path=$CODE_PATH,
@@ -144,19 +121,19 @@ elif [ "$2" == "engine_wf" ] ; then
 			\\$results_path=$RESULTS_PATH,
 			\\$tmp_path=$RUN_TMP_PATH,
 			\\$report_templates_path=$REPORTS_TEMPLATES,
-			\\$omim=$INPUTS_PATH"/omim_pubmed_profiles.txt",
-			\\$omim2=$INPUTS_PATH"/omim2_pubmed_profiles.txt"			       
+			\\$prefilter_pmids_file=$PREFILTER_PMIDS_FILE,
+			\\$postfilter_chunksize=$PUBMED_CHUNKSIZE_FILT,		       
 			" | tr -d [:space:]`
 		AutoFlow -e -w $ENGINE_AUTOFLOW_TEMPLATE_PATH -V $variables -o $ENGINE_EXEC_PATH -m 20gb -t 3-00:00:00 -n cal -c 10 -L $3
 
 elif [ "$2" == "prepare_bench" ]; then
 		for GOLD in $GOLD_STANDARDS; do
-			#Get LLM and MONDO|OMIM common pmIDs
+			#Get Model and Disease common pmIDs
 			desaggregate_column_data -i $INPUTS_PATH/$GOLD"_pubmed_profiles.txt" -x 2 | aggregate_column_data -i - -x 2 -a 1 > $RUN_TMP_PATH/reverse_aggregated_$GOLD"_pmid_profiles.txt"
 			intersect_columns -a $RUN_TMP_PATH/reverse_aggregated_$GOLD"_pmid_profiles.txt" -b $RESULTS_PATH/llm_pmID_profiles.txt -A 1 -B 1 --k c --full |\
 							cut -f 1,2 | desaggregate_column_data -i - -x 2 | aggregate_column_data -i - -x 2 -a 1 | sort -u > $RUN_TMP_PATH/$GOLD"_pubmed_profiles_common_pmids.txt"
 
-			#Get MONDO|OMIM IDs with both HPO and pmID profiles
+			#Get Disease IDs with both HPO and pmID profiles
 			intersect_columns -a $RUN_TMP_PATH/$GOLD"_pubmed_profiles_common_pmids.txt" -b $INPUTS_PATH/$GOLD"_hpo_profiles.txt" -A 1 -B 1 --k c --full > $RUN_TMP_PATH/$GOLD"_pmids_and_hpos" 
 			cut -f 1,2 $RUN_TMP_PATH/$GOLD"_pmids_and_hpos" | sort -u > $RUN_INPUTS_PATH/$GOLD"_PMIDs_cleaned"
 			cut -f 3,4 $RUN_TMP_PATH/$GOLD"_pmids_and_hpos" | sort -u > $RUN_INPUTS_PATH/$GOLD"_HPOs_cleaned"
@@ -166,6 +143,7 @@ elif [ "$2" == "prepare_bench" ]; then
 elif [ "$2" == "bench_wf" ]; then
 		source ~soft_bio_267/initializes/init_autoflow
 		source $PYENV/bin/activate #TODO: Remove later
+		export PATH=$PYENV/bin:$PATH
 
 		for GOLD in $GOLD_STANDARDS; do
 			#Get the number of records to process and the package size
@@ -200,28 +178,33 @@ elif [ "$2" == "reports" ]; then
 		source $PYENV/bin/activate #TODO: Remove later
 
 		for GOLD in $GOLD_STANDARDS; do
+			mkdir -p $RESULTS_PATH/reports/cohort_"$GOLD"
 			echo "Getting $GOLD benchmark report"
 			echo $GOLD > $TMP_PATH/gold_filename_prefix.txt
-			data_paths=`echo -e "
-				$TMP_PATH/HPO_terms_depth,
-				$PUBMED_FILES_STATS_PATH/file_proportion_stats,
-				$PUBMED_FILES_STATS_PATH/file_raw_stats,
-				$PUBMED_FILES_STATS_PATH/total_proportion_stats,
-				$PUBMED_FILES_STATS_PATH/total_stats,
-				$RESULTS_PATH/pubmed_metadata,
-				$RESULTS_PATH/llm_filtered_scores,
-				$RESULTS_PATH/llm_vs_"$GOLD"_semantic_similarity_hpo_based.txt,
-				$RESULTS_PATH/number_of_records_"$GOLD".txt,
-				$RUN_INPUTS_PATH/"$GOLD"_HPOs_cleaned,
-				$RUN_INPUTS_PATH/"$GOLD"_PMIDs_cleaned,			        
-				$RESULTS_PATH/llm_pmID_profiles.txt,
-				$TMP_PATH/gold_filename_prefix.txt
-				" | tr -d [:space:]` 
+			#data_paths=`echo -e "
+			#	$TMP_PATH/HPO_terms_depth,
+			#	$PUBMED_FILES_STATS_PATH/file_proportion_stats,
+			#	$PUBMED_FILES_STATS_PATH/file_raw_stats,
+			#	$PUBMED_FILES_STATS_PATH/total_proportion_stats,
+			#	$PUBMED_FILES_STATS_PATH/total_stats,
+			#	$RESULTS_PATH/pubmed_metadata,
+			#	$RESULTS_PATH/llm_filtered_scores,
+			#	$RESULTS_PATH/llm_vs_"$GOLD"_semantic_similarity_hpo_based.txt,
+			#	$RESULTS_PATH/number_of_records_"$GOLD".txt,
+			#	$RUN_INPUTS_PATH/"$GOLD"_HPOs_cleaned,
+			#	$RUN_INPUTS_PATH/"$GOLD"_PMIDs_cleaned,			        
+			#	$RESULTS_PATH/llm_pmID_profiles.txt,
+			#	$TMP_PATH/gold_filename_prefix.txt
+			#	" | tr -d [:space:]` 
+#
+			#report_html -d $data_paths \
+			#			-t $REPORTS_TEMPLATES/stEngine_and_similitudes.txt \
+			#			-o $RESULTS_PATH/reports/stEngine_and_similitudes_$GOLD
 
-			report_html -d $data_paths \
-						-t $REPORTS_TEMPLATES/stEngine_and_similitudes.txt \
-						-o $RESULTS_PATH/reports/stEngine_and_similitudes_$GOLD
+			cohort_analyzer -i $RUN_INPUTS_PATH/"$GOLD"_HPOs_cleaned -o $RESULTS_PATH/reports/cohort_"$GOLD"/cohort_analyzer -d 0 -p 1 -S "," -m lin -a -H
 		done
+		cohort_analyzer -i $RESULTS_PATH/llm_pmID_profiles.txt -o $RESULTS_PATH/reports/cohort_stEngine/cohort_analyzer -d 0 -p 1 -S "," -m lin -a -H
+		
 
 elif [ `echo $2 | cut -f 2 -d "_"` == "check" ]; then 
 		. ~soft_bio_267/initializes/init_autoflow

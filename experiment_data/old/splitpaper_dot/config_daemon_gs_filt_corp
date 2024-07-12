@@ -1,25 +1,24 @@
-export RUN_NAME="OMIM_DO/splitabstract"
-export ZEROBENCH_GOLD_STANDARD="omim_pubmed_profiles.txt"
-export GOLD_STANDARDS="omim" #export GOLD_STANDARDS="omim omim2 mondo"
-export PREFILTER_PMIDS_FILE=""
+export RUN_NAME="gsfiltcorp_splitpaper_dot"
 
-export CORPUS_PATH="/mnt2/fscratch/users/pab_001_uma/pedro/software_data/pubmed"
+export CORPUS_PATH="/mnt2/fscratch/users/bio_267_uma/jperezg/papers/downloaded"
 
-export PUBMED_CHUNKSIZE=300000
+export PUBMED_CHUNKSIZE=5000
+export PUBMED_CHUNKSIZE_FILT=100
 export SOFT_MIN_SIMILARITY=0.6
-export HARD_MIN_SIMILARITY=0.6
+export HARD_MIN_SIMILARITY=0.7
 export TOP_K=5
 
 export ENGINE_AUTOFLOW_TEMPLATE="workflow.af"
 
 export SPLITTED="-s"
-export PAPER=""
-export EQUIVALENCES=""
+export PAPER="-p"
+export EQUIVALENCES="-e $INPUTS_PATH/PMC-PMID_equivalencies"
 
 export GPU_DEVICES="cuda:0-cuda:1-cuda:2-cuda:3-cuda:4-cuda:5-cuda:6-cuda:7"
 export N_GPUs="gres=gpu:"`echo $GPU_DEVICES | tr "-" "\n" | grep "cuda" | wc -l`
-export USE_GPU_FOR_SIM_CALC=""
+export USE_GPU_FOR_SIM_CALC="--use_gpu_for_sim_calculation"
 
+export GOLD_STANDARDS="omim2"
 
 
 #CREATE SEVERAL CORPUS BALANCED-FILLED FOLDERS TO DRISTIBUTE THE EMBEDDING AND SIM CALCULATION PROCESS IN SEVERAL NODES
@@ -30,5 +29,6 @@ export PARALLEL_FOLDERS_ARRAY=(${FOLDERS_TO_PARALLELIZE//;/ })
 export N_PARALLEL_FOLDERS=${#PARALLEL_FOLDERS_ARRAY[@]}
 
 
-export BENCH_PACKAGE_SIZE=5
+export BENCH_PACKAGE_SIZE=20
 
+export PREFILTER_PMIDS_FILE=$TMP_PATH/omim2_unique_PMIDs

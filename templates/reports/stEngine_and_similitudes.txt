@@ -14,9 +14,9 @@
     def embedd_venn(sets_raw, labels, plotter, idd, title):
         plt.figure(figsize=(10,6))
         sets = Counter()
-        sets['01'] = sets_raw[0]
+        sets['10'] = sets_raw[0] - sets_raw[2]
+        sets['01'] = sets_raw[1] - sets_raw[2]
         sets['11'] = sets_raw[2]
-        sets['10']  = sets_raw[1]
 
         ax = plt.gca()
         v = venn2(subsets = sets, set_labels = labels, ax = ax)
@@ -66,6 +66,14 @@
     plotter.hash_vars["top_5_no_abstracts"] = top_5_no_abstracts_transposed
     plotter.hash_vars["top_5_no_abstracts"][0] = [os.path.basename(file) for file in plotter.hash_vars["top_5_no_abstracts"][0]]
 
+    total_stats = plotter.hash_vars["total_stats"]
+    total_stats[0].pop(1)
+    total_stats[1].pop(1)
+    total_stats_zipped = list(zip(*total_stats))
+    total_stats_nonzero_zipped = [ pair for pair in total_stats_zipped if pair[1] != "0" ]
+    total_stats_nonzero = list(map(list, zip(*total_stats_nonzero_zipped)))
+    plotter.hash_vars["total_stats_nonzero"] = total_stats_nonzero
+
     ######### Sentence Transformers' brought papers stats  preprocessing
     hpo_counts = Counter([row[1] for row in plotter.hash_vars["llm_filtered_scores"]])
     pmid_counts = Counter([row[0] for row in plotter.hash_vars["llm_filtered_scores"]])
@@ -89,7 +97,7 @@
 
 ${ plotter.create_title('Pubmed Abstract extraction and preprocessing', id='section1_from', hlevel=1, indexable=True, clickable=True, t_id='section1_to', clickable_text = '(Click me)') }
 <%
-    section1 =  plotter.pie(id="total_stats", header=True, row_names= True, transpose = True, fields = [0,2,3,4], func=process_pie_data,  
+    section1 = plotter.pie(id="total_stats_nonzero", header=True, row_names= True, transpose = True, func=process_pie_data,  
                                 title="Pubmed articles stats") + "\n"
     section1 += plotter.density(id="file_proportion_stats", header=True, row_names= True, fields=[0,2], 
                                 config = {"yAxisTitle": "File number", "xAxisTitle": "Missing abstracts proportion"},
@@ -117,9 +125,18 @@ ${ plotter.create_collapsable_container('section1_to', section1, display='visibl
 
     papers_drawn_by_the_model = set(dict(plotter.hash_vars['llm_pmID_profiles.txt']).keys())
     published_years = [["year", "pmid"]] + [ [int(clean_num(row[2])), row[0]] for row in plotter.hash_vars["pubmed_metadata"][1:] 
-                                                if row[2] != "0" and int(clean_num(row[2])) <= 2024 and int(clean_num(row[2])) > 1980 
-                                                and row[0] in papers_drawn_by_the_model]
+                                                if  row[2] != "0" and 
+                                                    int(clean_num(row[2])) <= 2024 and 
+                                                    #int(clean_num(row[2])) > 1980 and 
+                                                    row[0] in papers_drawn_by_the_model]
     plotter.hash_vars["published_years"] = published_years
+
+    def plot_with_integer_ticks(data, plotter_list):
+        import math
+        plotter_list["sns"].boxplot(data=data, y="year")
+        ticks = range(math.floor(min(data["year"])), math.ceil(max(data["year"]))+1, int((max(data["year"])-min(data["year"]))/10) )
+        plotter_list["plt"].yticks(ticks)
+
 
 %>
 ${ plotter.create_title("Sentence Transformers Model's brought paper stats", id='section2_from', hlevel=1, indexable=True, clickable=True, t_id='section2_to', clickable_text = '(Click me)') }
@@ -127,7 +144,7 @@ ${ plotter.create_title("Sentence Transformers Model's brought paper stats", id=
     section2 = '<div style="overflow: hidden; display: flex; flex-direction: row; justify-content: center;">' + "\n"
     section2 +=  plotter.static_plot_main(id="published_years", width = 400, height = 800, header=True, row_names= False, fields=[0], rezisable=False,
                                         title="Publication year", x_label = "Year", y_label = "",
-                                        plotting_function=  lambda data, plotter_list: plotter_list["sns"].boxplot(data=data, y="year"),
+                                        plotting_function=  plot_with_integer_ticks,
                                         img_attribs=f"width=31% height=45%" ) + "\n"
     section2 +=  plotter.static_plot_main(id="similitudes", width = 400, height = 800, header=True, row_names= False, fields=[0], rezisable=False,
                                         title="Distribution of semantic scores", x_label = "Semantic Score", y_label = "Number of Abstract-HP term relations",
@@ -248,8 +265,8 @@ ${ plotter.create_title(f"Gold Standard: {pretty_names[gold]}", id=f'{gold}_from
     section3 += embedd_venn(sets_raw = (n_records_dict[f"{gold}_pmid_profiles"], n_records_dict[f"{gold}_hpo_profiles"], n_records_dict[f"{gold}_with_pmid_and_hpo"]), 
                             labels = (f'at least 1 abstract', f'at least 1 HP'),
                             plotter = plotter, idd= f"{gold}_venn1", title="Diseases original data") + "\n"
-    section3 += embedd_venn(sets_raw = (n_records_dict["llm_pmid_profiles"], n_records_dict[f"{gold}_with_pmid_and_hpo"], n_records_dict[f"llm_and_{gold}_with_pmid_and_hpo"]), 
-                            labels = (f'from diseases', 'from HP-model annotation'),
+    section3 += embedd_venn(sets_raw = (n_records_dict["model_PMIDs"], n_records_dict[f"{gold}_PMIDs"], n_records_dict[f"common_PMIDs"]), 
+                            labels = (f'from HP-model annotation', 'from diseases'),
                             plotter = plotter, idd= f"{gold}_venn2", title="Abstracts intersected with diseases") + "\n"
     section3 += '</div></div>' + "\n"
     section3 += '<div class="row"><div class="col-12">' + "\n"

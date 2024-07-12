@@ -2,6 +2,7 @@ calc_sem_sim_chunk_$gold_[$package_number]){
 	. ~soft_bio_267/initializes/init_python
 	export PATH=$code_path:$PATH #TODO: Remove later
 	source $pyenv/bin/activate #TODO: Remove later
+	rm filtered.txt
 
 	current_package_number=(*)
 	start_line=`echo "$current_package_number*$package_size+1" | bc`
@@ -14,13 +15,16 @@ calc_sem_sim_chunk_$gold_[$package_number]){
 		grep $current_mondo_ID $mondo_pmID_profiles > current_mondo_pubmeds_goldstandard
 		?
 		semtools -i $llm_pmID_profiles -O HPO -o current_mondo_sims -s lin --reference_profiles current_mondo_hpo_profile -S ","
-		get_mondo_filtered_pmID_sim_values.py -s current_mondo_sims -m current_mondo_pubmeds_goldstandard -p $pubmed_metadata -o filtrados.txt -t 10
+		get_mondo_filtered_pmID_sim_values.py -s current_mondo_sims -m current_mondo_pubmeds_goldstandard -p $pubmed_metadata -o current_filtered.txt -t 10
+		cat current_filtered.txt >> filtered.txt
 	done
-	if [[ ! -s filtrados.txt ]]; then exit 1; fi #exit if no results
+	rm current_mondo_sims
+	if [[ ! -s filtered.txt ]]; then exit 1; fi #exit if no results
 }
 
 aggregate_results){
+	rm llm_vs_$gold'_semantic_similarity_hpo_based.txt'
 	?
-	cat !calc_sem_sim_chunk_$gold_!/filtrados.txt > llm_vs_$gold'_semantic_similarity_hpo_based.txt'
+	cat !calc_sem_sim_chunk_$gold_!/filtered.txt > llm_vs_$gold'_semantic_similarity_hpo_based.txt'
 	cp llm_vs_$gold'_semantic_similarity_hpo_based.txt' $results_path/llm_vs_$gold'_semantic_similarity_hpo_based.txt'
 }

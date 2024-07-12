@@ -2,33 +2,41 @@ get_goldstandard_PMIDs_and_OMIMIDs){
     . ~soft_bio_267/initializes/init_python
     export PATH=$code_path:$PATH #TODO: Remove later
     ?
-    join_gs_common_omim_pmids --omim1_file $omim --omim2_file $omim2 -o joined_omims.txt
-    cut -f 1 > gs_unique_OMIM_ids
-    cut -f 2 | tr "," "\n" | sort -u > gs_unique_PMIDs
+    cut -f 1 $omim_file > OMIM_IDS_TO_PREFILTER
+    cut -f 2 $omim_file | tr "," "\n" | sort -u > OMIM_PMIDS_TO_FILTER
 }
 
 filter_query){
     ?
-    grep -f get_goldstandard_PMIDs_and_OMIMIDs)"/gs_unique_OMIM_ids" $queries | gzip > filtered_queries.gz
+    grep -wf get_goldstandard_PMIDs_and_OMIMIDs)/OMIM_IDS_TO_PREFILTER $queries > pre_filtered_queries
+	if [[ ! -s pre_filtered_queries ]]; then exit 1; fi
 }
 
 get_and_filter_abstracts){
-	resources: -n cal -c 50 -t '0-10:00:00' -m '400gb'
+	resources: -n cal -c 150 -t '1-12:00:00' -m '650gb'
 	. ~soft_bio_267/initializes/init_python
 
 	export PATH=$code_path:$PATH #TODO: Remove later
 	source $pyenv/bin/activate #TODO: Remove later
 	
+	ln -s get_goldstandard_PMIDs_and_OMIMIDs)/OMIM_PMIDS_TO_FILTER OMIM_PMIDS_TO_FILTER
 	n_cpus=$(([cpu] - 3))
 	mkdir indexes
 	?
 	get_pubmed_index -i "$pubmed_path/*" -o indexes -t "pubmed_" -k $pubmed_chunksize -c $n_cpus -d $splitted $paper $equivalences
-    zcat indexes/*.gz | grep -f get_goldstandard_PMIDs_and_OMIMIDs)"/gs_unique_PMIDs" | gzip > filtered_corpus.gz
+    zcat indexes/*.gz | grep -wf OMIM_PMIDS_TO_FILTER > filtered_corpus_raw
+	intersect_columns -a filtered_corpus_raw -b OMIM_PMIDS_TO_FILTER -A 1 -B 1 --k c --full | cut -f 1-7 | gzip > filtered_corpus.gz
+	if [[ `zcat filtered_corpus.gz | wc -l` == 0 ]]; then exit 1; fi
+	
+	zcat filtered_corpus.gz | cut -f 1 > common_pmids
+	grep -wf common_pmids $omim_file | cut -f 1 > OMIM_IDS_TO_FILTER
+	grep -wf OMIM_IDS_TO_FILTER $queries > filtered_queries
+	if [[ ! -s filtered_queries ]]; then exit 1; fi	
+	rm indexes/*
 }
 
-
 query_abstracts){
-    resources: -n dgx -c 120 -t '6-00:00:00' -m '360gb' -A exclude=exa01;$n_gpus
+    resources: -n dgx -c 120 -t '6-00:00:00' -m '860gb' -A exclude=exa01;$n_gpus
 	. ~soft_bio_267/initializes/init_python
 	export PATH=$code_path:$PATH #TODO: Remove later
 	source $pyenv/bin/activate #TODO: Remove later
@@ -40,21 +48,65 @@ query_abstracts){
 
 	mkdir semantic_scores
 	query_basename=`basename $queries`
-    n_corpus=`zcat get_and_filter_abstracts)"/filtered_corpus.gz" | wc -l B | cut -f 1 -d " "`
+    #n_corpus=`zcat get_and_filter_abstracts)"/filtered_corpus.gz" | wc -l | cut -f 1 -d " "`    #previous value to use for -k flag
 	?
 	stEngine -m $model_name -p $current_model \
-             -c get_and_filter_abstracts)"/filtered_corpus.gz" \
-             -q filter_query)"/filtered_queries.gz" \
-             -k $n_corpus -t "-1" -o semantic_scores \
-             -g $gpu_csv $splitted -v $use_gpu_for_sim_calc
+             -c get_and_filter_abstracts)/filtered_corpus.gz \
+             -q get_and_filter_abstracts)/filtered_queries \
+             -k 0 -t "-1" -o semantic_scores \
+             -g $gpu_csv $splitted -v $use_gpu_for_sim_calc \
+			 --order "query-corpus"
 
-	if [[ ! -s semantic_scores/$query_basename ]]; then exit 1; fi #exit if no results
-	awk '{print $2 "\t" $1 "\t" $3 }' semantic_scores/$query_basename > rankings
-
+	if [[ ! -s semantic_scores/filtered_queries ]]; then exit 1; fi #exit if no results
+	#awk '{print $2 "\t" $1 "\t" $3 }' semantic_scores/$query_basename > rankings
+	
+	#TODO: hacer script para agregar el resultado del stengine y escribir a zip. Hacer que el stEngine pueda escribir comprimido
+	sed -E 's/_[0-9]+_[0-9]+//g' semantic_scores/filtered_queries | aggregate_column_data -i - -x 1,2 -a 3 -A max > rankings
+	#rm -rf semantic_scores/*
 }
 
-rank_diseases){
-    ?
-    collapse_same_HPs_inside_of_splitted_abstract.py -i query_abstracts)"/rankings" -o rankings
-    cut -f 1 query_abstracts)"/rankings" | sort -u |
+rank_diseases[0-209]){
+	. ~soft_bio_267/initializes/init_python
+	rm all_rankings_rankerlike
+
+	rm ALL_OMIM_IDS_TO_FILTER; ln -s get_and_filter_abstracts)/filtered_queries ALL_OMIM_IDS_TO_FILTER
+	ln -s query_abstracts)/rankings rankings
+
+	package_size=20
+	current_package_number=(*)
+	start_line=`echo "$current_package_number*$package_size+1" | bc`
+	subset_table -i ALL_OMIM_IDS_TO_FILTER -s $start_line -l $package_size | cut -f 1 > OMIM_IDS_TO_FILTER
+
+
+	while read OMIM_ID; do
+		echo $OMIM_ID
+		grep -w $OMIM_ID rankings > current_rankings
+		grep -w $OMIM_ID $omim_file | cut -f 2 | tr "," "\n" > omim_pmids
+    	?
+		make_zerobench_rankings.py -i current_rankings -o current_rankings_rankerlike -f omim_pmids
+		cat current_rankings_rankerlike >> all_rankings_rankerlike
+	done < OMIM_IDS_TO_FILTER
+
+	sleep 180
+	if [[ ! -s all_rankings_rankerlike ]]; then exit 1; fi #exit if no results
+}
+
+aggregate_results){
+	. ~soft_bio_267/initializes/init_python
+	. ~soft_bio_267/initializes/init_R
+	export PATH=/mnt/home/soft/soft_bio_267/programs/x86_64/scripts:$PATH
+
+	rm all_rankings_rankerlike
+	?
+	cat !rank_diseases!/all_rankings_rankerlike > all_rankings_rankerlike
+	awk '{if($7 == 1) print $0}' all_rankings_rankerlike > filtered_rankings
+
+	ROCanalysis.R -i all_rankings_rankerlike -s 2 -t 7 -S stEngine -o "stEngine_ROC" -m "ROC" -M "acc:tpr:fpr:prec:rec" -e #--reverse_score_order
+
+	report_html -d "filtered_rankings,stEngine_ROC_measures" \
+				-t $report_templates_path/zerobench.txt \
+				-o disease_rankings
+	
+	if [[ ! -s disease_rankings.html ]]; then exit 1; fi #exit if no results
+	cp disease_rankings.html $results_path/reports/disease_rankings.html
 }
