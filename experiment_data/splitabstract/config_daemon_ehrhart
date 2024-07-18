@@ -1,7 +1,8 @@
-export RUN_NAME="OMIM_DO/prefilter_splitabstract"
-export ZEROBENCH_GOLD_STANDARD="omim_pubmed_profiles.txt"
-export GOLD_STANDARDS="omim"
-export PREFILTER_PMIDS_FILE=$TMP_PATH/pmids_to_filter_abstracts_omim
+export RUN_NAME="OMIM_ehrhart/splitabstract"
+export ZEROBENCH_GOLD_STANDARD="omim2_pubmed_profiles.txt"
+export GOLD_STANDARDS="omim2" #export GOLD_STANDARDS="omim omim2 mondo"
+export PREFILTER_PMIDS_FILE=$TMP_PATH/omim2_unique_PMIDs  #$TMP_PATH/pmids_to_filter_abstracts_omim
+export METAREPORT_TAG="ehrhart.abstracts"
 
 export CORPUS_PATH="/mnt2/fscratch/users/pab_001_uma/pedro/software_data/pubmed"
 
@@ -22,6 +23,7 @@ export N_GPUs="gres=gpu:"`echo $GPU_DEVICES | tr "-" "\n" | grep "cuda" | wc -l`
 export USE_GPU_FOR_SIM_CALC=""
 
 
+
 #CREATE SEVERAL CORPUS BALANCED-FILLED FOLDERS TO DRISTIBUTE THE EMBEDDING AND SIM CALCULATION PROCESS IN SEVERAL NODES
 export PARALLEL_FOLDERS_BASENAME="chunk"
 export FOLDERS_TO_PARALLELIZE="${PARALLEL_FOLDERS_BASENAME}0;${PARALLEL_FOLDERS_BASENAME}1;${PARALLEL_FOLDERS_BASENAME}2;${PARALLEL_FOLDERS_BASENAME}3;${PARALLEL_FOLDERS_BASENAME}4;${PARALLEL_FOLDERS_BASENAME}5" #"${PARALLEL_FOLDERS_BASENAME}0;${PARALLEL_FOLDERS_BASENAME}1;${PARALLEL_FOLDERS_BASENAME}2"
@@ -30,4 +32,4 @@ export PARALLEL_FOLDERS_ARRAY=(${FOLDERS_TO_PARALLELIZE//;/ })
 export N_PARALLEL_FOLDERS=${#PARALLEL_FOLDERS_ARRAY[@]}
 
 
-export BENCH_PACKAGE_SIZE=5
+export BENCH_PACKAGE_SIZE=15

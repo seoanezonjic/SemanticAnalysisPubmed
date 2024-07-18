@@ -1,0 +1,86 @@
+<%
+    import numpy as np
+    import pandas as pd
+    #PMID:21288095	0.4846	0.00028336639274582036	1	1	OMIM:211800	0	0	1	do	abstracts
+    plotter.hash_vars["all_phenotype_data"].insert(0, 
+    ["pmid", "score", "norm_rank", "abs_rank1", "abs_rank2", "omim_id", "n_newer", "n_older", "repeats", "gold_standard", "type"])
+
+    #PMID:23785305	0.9742591878001088	0.006666666666666667	2	2	OMIM:107600	1	ehrhart	papers
+    plotter.hash_vars["all_disease_data"].insert(0, 
+    ["pmid", "score", "norm_rank", "abs_rank1", "abs_rank2", "omim_id", "is_gs", "gold_standard", "type"])
+
+    #Preparing selected top-k data
+    for dataset in ["all_phenotype_data", "all_disease_data"]:
+        for data_type in ["papers", "abstracts"]:
+            for gs_type in ["ehrhart", "do"]:
+                #print(f"Processing {dataset} {data_type} {gs_type}")
+                abs_rankings = np.array(sorted([int(row[3]) for row in plotter.hash_vars[dataset] if row[-2] == gs_type and row[-1] == data_type]))
+                cumms = [ np.mean(abs_rankings <= pos) for pos in range(1, len(abs_rankings)+1)]
+                norm_pos = np.array(range(1, len(cumms)+1)) / len(cumms)
+                abs_pos = [f"top{k}" for k in list(range(1, len(cumms)+1))] 
+                cumm_dist_data = [list(pair)+[gs_type, data_type] for pair in zip(abs_pos, norm_pos, cumms)]
+                
+                if not plotter.hash_vars.get(f"{dataset}_cumm_dist"):
+                    cumm_dist_data = [["topk", "pos", "dist", "gold_standard", "type"]] + cumm_dist_data
+                    plotter.hash_vars[f"{dataset}_cumm_dist"] = cumm_dist_data
+                    plotter.hash_vars[f"{dataset}_topk"] = [[cumm_dist_data[row_idx][0], cumm_dist_data[row_idx][2], 
+                                                         cumm_dist_data[row_idx][3], cumm_dist_data[row_idx][4]] for row_idx in [0,1,2,5,10]]
+                else:
+                    plotter.hash_vars[f"{dataset}_cumm_dist"] += cumm_dist_data
+                    plotter.hash_vars[f"{dataset}_topk"] += [[cumm_dist_data[row_idx][0], cumm_dist_data[row_idx][2], 
+                                                         cumm_dist_data[row_idx][3], cumm_dist_data[row_idx][4]] for row_idx in [0,1,4,9]]
+        #print(plotter.hash_vars[f"{dataset}_topk"])
+    
+        topk_order = {"top1": 1, "top2": 2, "top5": 3, "top10": 4}
+        for data_type in ["papers", "abstracts"]:
+            df = pd.DataFrame([row[:-1] for row in plotter.hash_vars[f"{dataset}_topk"] if data_type in row], columns = ["topk", "dist", "gold_standard"])
+            pivoted = pd.pivot_table(df, index='topk', columns='gold_standard', values='dist', margins=False)
+            pivoted = pivoted.rename(columns={"do":"do", "ehrhart":"ehrhart"})
+            pivoted = pivoted.sort_values(by='topk', key=lambda x: x.map(topk_order))
+            pivoted_list = [["topk", "do", "ehrhart"]] + pivoted.reset_index().values.tolist()
+            plotter.hash_vars[f"{dataset}_{data_type}_topk"] = pivoted_list
+            
+        
+        
+%>
+
+<div style="overflow: hidden; display: flex; flex-direction: row; justify-content: center;">
+    ${ plotter.boxplot(id = 'all_disease_data', header = True, row_names = True, height = 500, width= 900, title = "Disease rankings in Ehrhart vs Disease Ontology",
+                        smp_attr = [5,6,7,8], fields = [0,2], x_label = "Normalized Rankings",
+                        group = ["gold_standard", "type"],
+                        config={"graphOrientation":"vertical"}
+    )}
+</div>
+<div style="overflow: hidden; display: flex; flex-direction: row; justify-content: center;">    
+    ${ plotter.boxplot(id = 'all_phenotype_data', header = True, row_names = True, height = 500, width= 900, title = "Phenotype rankings in Ehrhart vs Disease Ontology",
+                        smp_attr = [5,9,10], fields = [0,2], x_label = "Normalized Rankings",
+                        group = ["gold_standard", "type"],
+                        config={"graphOrientation":"vertical"}
+    )}
+</div>
+
+<% 
+    idx = 0
+    titles = {"all_phenotype_data_abstracts_topk": "Top-K True Positive Rate of Phenotypes in Abstracts",
+              "all_phenotype_data_papers_topk": "Top-K True Positive Rate of Phenotypes in Papers",
+              "all_disease_data_abstracts_topk": "Top-K True Positive Rate of Diseases in Abstracts",
+              "all_disease_data_papers_topk": "Top-K True Positive Rate of Diseases in Papers"}
+    h1title = "Disease TopK Rankings in Ehrhart vs Disease Ontology"
+ %>
+%for barplosito in ["all_disease_data_abstracts_topk", "all_disease_data_papers_topk", "all_phenotype_data_abstracts_topk", "all_phenotype_data_papers_topk"]:
+    %if idx % 2 == 0:
+        <div style="overflow: hidden; display: flex; flex-direction: row; justify-content: center;">
+            <h3>${h1title}</h3>
+        </div>
+        <div style="overflow: hidden; display: flex; flex-direction: row; justify-content: center;">
+    %endif
+    ${plotter.barplot(id=barplosito, header=True, row_names=True, height = 500, width= 500,
+                        title=titles[barplosito], x_label="True Positive Rate",
+                        config= { "graphOrientation": "vertical", "setMinX": 0, "setMaxX": 1}
+    )}
+    %if idx % 2 == 1:
+        </div>
+    %endif
+    <% idx += 1 %>
+    <% h1title = "Phenotype TopK Rankings in Ehrhart vs Disease Ontology" %>
+%endfor

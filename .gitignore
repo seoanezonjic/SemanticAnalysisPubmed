@@ -2,6 +2,7 @@ models/
 inputs/
 queries/
 results/
+global_results/
 tmp/
 previous_results/
 debug/

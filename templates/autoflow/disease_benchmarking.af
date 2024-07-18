@@ -20,6 +20,7 @@ calc_sem_sim_chunk_$gold_[$package_number]){
 	done
 	rm current_mondo_sims
 	if [[ ! -s filtered.txt ]]; then exit 1; fi #exit if no results
+	sleep 180
 }
 
 aggregate_results){
@@ -27,4 +28,11 @@ aggregate_results){
 	?
 	cat !calc_sem_sim_chunk_$gold_!/filtered.txt > llm_vs_$gold'_semantic_similarity_hpo_based.txt'
 	cp llm_vs_$gold'_semantic_similarity_hpo_based.txt' $results_path/llm_vs_$gold'_semantic_similarity_hpo_based.txt'
+}
+
+prepare_metareport_data){
+	tag_formatted=`echo $metareport_tag | tr "." "_"`
+	?
+	cat aggregate_results)/llm_vs_$gold'_semantic_similarity_hpo_based.txt' |awk -v tag="$metareport_tag" 'BEGIN{OFS="\t"; split(tag,tag_arr,".")}{print $0,tag_arr[1],tag_arr[2]}' > phenotype_rankings_$tag_formatted
+	cp phenotype_rankings_$tag_formatted $metareport_results_path/../phenotype_rankings_$tag_formatted
 }

@@ -11,6 +11,7 @@ export CODE_PATH=$CURRENT_PATH/scripts
 export TEMPLATES_PATH=$CURRENT_PATH/templates
 export AUTOFLOW_TEMPLATES=$TEMPLATES_PATH/autoflow
 export REPORTS_TEMPLATES=$TEMPLATES_PATH/reports
+export METAREPORT_RESULTS_PATH=$CURRENT_PATH"/global_results/metareport"
 
 export MODEL_PATH=$CURRENT_PATH/models
 export MODEL_NAME="all-mpnet-base-v2" #export MODEL_NAME="all-MiniLM-L6-v2"
@@ -42,8 +43,9 @@ echo -e "engine_wf\t$ENGINE_EXEC_PATH" > $CURRENT_PATH/workflow_paths
 echo -e "bench_wf\t$PROFILES_EXEC_PATH" >> $CURRENT_PATH/workflow_paths
 echo -e "zerobench_wf\t$ZEROBENCH_EXEC_PATH" >> $CURRENT_PATH/workflow_paths
 
-mkdir -p $RESULTS_PATH; mkdir -p $RESULTS_PATH/reports; mkdir -p $RESULTS_PATH/reports/cohort_stEngine; mkdir -p $INPUTS_PATH ; mkdir -p $TMP_PATH; mkdir -p $PUBMED_FILES_STATS_PATH; 
-mkdir -p $AUTOFLOW_TEMPLATES; mkdir -p $REPORTS_TEMPLATES; mkdir -p $QUERIES_PATH ; mkdir -p $TEMPLATES_PATH; mkdir -p $RUN_FOLDER; mkdir -p $RUN_TMP_PATH; mkdir -p $RUN_INPUTS_PATH
+mkdir -p $RESULTS_PATH; mkdir -p $RESULTS_PATH/reports; mkdir -p $RESULTS_PATH/reports/cohort_stEngine; mkdir -p $INPUTS_PATH ; mkdir -p $TMP_PATH
+mkdir -p $PUBMED_FILES_STATS_PATH; mkdir -p $AUTOFLOW_TEMPLATES; mkdir -p $REPORTS_TEMPLATES; mkdir -p $QUERIES_PATH ; mkdir -p $TEMPLATES_PATH; 
+mkdir -p $RUN_FOLDER; mkdir -p $RUN_TMP_PATH; mkdir -p $RUN_INPUTS_PATH; mkdir -p $METAREPORT_RESULTS_PATH
 #OTHER VARIABLES
 export database_ids="OMIM ORPHA"
 
@@ -90,7 +92,9 @@ elif [ "$2" == "zerobench_wf" ] ; then
 			\\$pubmed_chunksize=$PUBMED_CHUNKSIZE,
 			\\$results_path=$RESULTS_PATH,
 			\\$report_templates_path=$REPORTS_TEMPLATES,
-			\\$omim_file=$INPUTS_PATH/$ZEROBENCH_GOLD_STANDARD,			       
+			\\$omim_file=$INPUTS_PATH/$ZEROBENCH_GOLD_STANDARD,
+			\\$metareport_tag=$METAREPORT_TAG,
+			\\$metareport_results_path=$METAREPORT_RESULTS_PATH,			       
 			" | tr -d [:space:]`
 		AutoFlow -e -w $AUTOFLOW_TEMPLATES/zero_bench.af -V $variables -o $ZEROBENCH_EXEC_PATH -m 20gb -t 3-00:00:00 -n cal -c 10 -L $3
 
@@ -162,7 +166,9 @@ elif [ "$2" == "bench_wf" ]; then
 						\\$package_number="0-$PACKAGE_NUMBER",
 						\\$package_size=$BENCH_PACKAGE_SIZE,
 						\\$report_templates_path=$REPORTS_TEMPLATES,
-						\\$gold=$GOLD
+						\\$gold=$GOLD,
+						\\$metareport_tag=$METAREPORT_TAG,
+						\\$metareport_results_path=$METAREPORT_RESULTS_PATH
 						" | tr -d [:space:]`
 			#AutoFlow -e -w $AUTOFLOW_TEMPLATES/disease_benchmarking.af -V $variables -o $PROFILES_EXEC_PATH""_$GOLD -m 40gb -t 3-00:00:00 -n cal -c 2 -L $2
 			AutoFlow -e -w $AUTOFLOW_TEMPLATES/disease_benchmarking.af -V $variables -o $PROFILES_EXEC_PATH""_$GOLD -m 30gb -t 3-00:00:00 -n cal -c 2 -L $3
@@ -181,30 +187,36 @@ elif [ "$2" == "reports" ]; then
 			mkdir -p $RESULTS_PATH/reports/cohort_"$GOLD"
 			echo "Getting $GOLD benchmark report"
 			echo $GOLD > $TMP_PATH/gold_filename_prefix.txt
-			#data_paths=`echo -e "
-			#	$TMP_PATH/HPO_terms_depth,
-			#	$PUBMED_FILES_STATS_PATH/file_proportion_stats,
-			#	$PUBMED_FILES_STATS_PATH/file_raw_stats,
-			#	$PUBMED_FILES_STATS_PATH/total_proportion_stats,
-			#	$PUBMED_FILES_STATS_PATH/total_stats,
-			#	$RESULTS_PATH/pubmed_metadata,
-			#	$RESULTS_PATH/llm_filtered_scores,
-			#	$RESULTS_PATH/llm_vs_"$GOLD"_semantic_similarity_hpo_based.txt,
-			#	$RESULTS_PATH/number_of_records_"$GOLD".txt,
-			#	$RUN_INPUTS_PATH/"$GOLD"_HPOs_cleaned,
-			#	$RUN_INPUTS_PATH/"$GOLD"_PMIDs_cleaned,			        
-			#	$RESULTS_PATH/llm_pmID_profiles.txt,
-			#	$TMP_PATH/gold_filename_prefix.txt
-			#	" | tr -d [:space:]` 
-#
-			#report_html -d $data_paths \
-			#			-t $REPORTS_TEMPLATES/stEngine_and_similitudes.txt \
-			#			-o $RESULTS_PATH/reports/stEngine_and_similitudes_$GOLD
+			data_paths=`echo -e "
+				$TMP_PATH/HPO_terms_depth,
+				$PUBMED_FILES_STATS_PATH/file_proportion_stats,
+				$PUBMED_FILES_STATS_PATH/file_raw_stats,
+				$PUBMED_FILES_STATS_PATH/total_proportion_stats,
+				$PUBMED_FILES_STATS_PATH/total_stats,
+				$RESULTS_PATH/pubmed_metadata,
+				$RESULTS_PATH/llm_filtered_scores,
+				$RESULTS_PATH/llm_vs_"$GOLD"_semantic_similarity_hpo_based.txt,
+				$RESULTS_PATH/number_of_records_"$GOLD".txt,
+				$RUN_INPUTS_PATH/"$GOLD"_HPOs_cleaned,
+				$RUN_INPUTS_PATH/"$GOLD"_PMIDs_cleaned,			        
+				$RESULTS_PATH/llm_pmID_profiles.txt,
+				$TMP_PATH/gold_filename_prefix.txt
+				" | tr -d [:space:]` 
+
+			report_html -d $data_paths \
+						-t $REPORTS_TEMPLATES/stEngine_and_similitudes.txt \
+						-o $RESULTS_PATH/reports/stEngine_and_similitudes_$GOLD
 
 			cohort_analyzer -i $RUN_INPUTS_PATH/"$GOLD"_HPOs_cleaned -o $RESULTS_PATH/reports/cohort_"$GOLD"/cohort_analyzer -d 0 -p 1 -S "," -m lin -a -H
 		done
 		cohort_analyzer -i $RESULTS_PATH/llm_pmID_profiles.txt -o $RESULTS_PATH/reports/cohort_stEngine/cohort_analyzer -d 0 -p 1 -S "," -m lin -a -H
 		
+elif [ "$2" == "metareport" ]; then
+		cat $METAREPORT_RESULTS_PATH/../disease* > $METAREPORT_RESULTS_PATH/all_disease_data
+		cat $METAREPORT_RESULTS_PATH/../phenotype* > $METAREPORT_RESULTS_PATH/all_phenotype_data
+		report_html -d "$METAREPORT_RESULTS_PATH/all_disease_data,$METAREPORT_RESULTS_PATH/all_phenotype_data" \
+					-t $REPORTS_TEMPLATES/metareport.txt \
+					-o $METAREPORT_RESULTS_PATH/metareport		
 
 elif [ `echo $2 | cut -f 2 -d "_"` == "check" ]; then 
 		. ~soft_bio_267/initializes/init_autoflow

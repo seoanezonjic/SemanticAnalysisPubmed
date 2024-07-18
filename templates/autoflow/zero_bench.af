@@ -1,4 +1,4 @@
-get_goldstandard_PMIDs_and_OMIMIDs){
+%get_goldstandard_PMIDs_and_OMIMIDs){
     . ~soft_bio_267/initializes/init_python
     export PATH=$code_path:$PATH #TODO: Remove later
     ?
@@ -6,13 +6,13 @@ get_goldstandard_PMIDs_and_OMIMIDs){
     cut -f 2 $omim_file | tr "," "\n" | sort -u > OMIM_PMIDS_TO_FILTER
 }
 
-filter_query){
+%filter_query){
     ?
     grep -wf get_goldstandard_PMIDs_and_OMIMIDs)/OMIM_IDS_TO_PREFILTER $queries > pre_filtered_queries
 	if [[ ! -s pre_filtered_queries ]]; then exit 1; fi
 }
 
-get_and_filter_abstracts){
+%get_and_filter_abstracts){
 	resources: -n cal -c 150 -t '1-12:00:00' -m '650gb'
 	. ~soft_bio_267/initializes/init_python
 
@@ -35,7 +35,7 @@ get_and_filter_abstracts){
 	rm indexes/*
 }
 
-query_abstracts){
+%query_abstracts){
     resources: -n dgx -c 120 -t '6-00:00:00' -m '860gb' -A exclude=exa01;$n_gpus
 	. ~soft_bio_267/initializes/init_python
 	export PATH=$code_path:$PATH #TODO: Remove later
@@ -65,7 +65,7 @@ query_abstracts){
 	#rm -rf semantic_scores/*
 }
 
-rank_diseases[0-209]){
+%rank_diseases[0-209]){
 	. ~soft_bio_267/initializes/init_python
 	rm all_rankings_rankerlike
 
@@ -109,4 +109,11 @@ aggregate_results){
 	
 	if [[ ! -s disease_rankings.html ]]; then exit 1; fi #exit if no results
 	cp disease_rankings.html $results_path/reports/disease_rankings.html
+}
+
+prepare_metareport_data){
+	tag_formatted=`echo $metareport_tag | tr "." "_"`
+	?
+	cat aggregate_results)/filtered_rankings | awk -v tag="$metareport_tag" 'BEGIN{OFS="\t"; split(tag,tag_arr,".")}{print $0,tag_arr[1],tag_arr[2]}' > disease_rankings_$tag_formatted
+	cp disease_rankings_$tag_formatted $metareport_results_path/../disease_rankings_$tag_formatted
 }
