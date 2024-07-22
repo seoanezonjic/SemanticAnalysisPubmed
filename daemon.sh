@@ -212,9 +212,11 @@ elif [ "$2" == "reports" ]; then
 		cohort_analyzer -i $RESULTS_PATH/llm_pmID_profiles.txt -o $RESULTS_PATH/reports/cohort_stEngine/cohort_analyzer -d 0 -p 1 -S "," -m lin -a -H
 		
 elif [ "$2" == "metareport" ]; then
+		cp $CURRENT_PATH"/runs/OMIM_ehrhart/splitpaper/results/llm_pmID_profiles.txt" $METAREPORT_RESULTS_PATH/ehrhart_papers_llm_pmID_profiles.txt
+		cp $CURRENT_PATH"/runs/OMIM_ehrhart/splitabstract/results/llm_pmID_profiles.txt" $METAREPORT_RESULTS_PATH/ehrhart_abstracts_llm_pmID_profiles.txt
 		cat $METAREPORT_RESULTS_PATH/../disease* > $METAREPORT_RESULTS_PATH/all_disease_data
 		cat $METAREPORT_RESULTS_PATH/../phenotype* > $METAREPORT_RESULTS_PATH/all_phenotype_data
-		report_html -d "$METAREPORT_RESULTS_PATH/all_disease_data,$METAREPORT_RESULTS_PATH/all_phenotype_data" \
+		report_html -d "$METAREPORT_RESULTS_PATH/all_disease_data,$METAREPORT_RESULTS_PATH/all_phenotype_data,$INPUTS_PATH/omim2_hpo_profiles.txt,$METAREPORT_RESULTS_PATH/ehrhart_papers_llm_pmID_profiles.txt,$METAREPORT_RESULTS_PATH/ehrhart_abstracts_llm_pmID_profiles.txt" \
 					-t $REPORTS_TEMPLATES/metareport.txt \
 					-o $METAREPORT_RESULTS_PATH/metareport		
 
