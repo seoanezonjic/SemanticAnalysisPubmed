@@ -1,0 +1,59 @@
+%for typee in ["abstracts", "papers"]:
+    <% 
+        max_disease_unique = max([row[5] for row in plotter.hash_vars[f"{gs}_profile_stats_{typee}"][1:]])
+        max_stEngine_unique = max([row[6] for row in plotter.hash_vars[f"{gs}_profile_stats_{typee}"][1:]])
+        max_axis_first_plot = max(max_disease_unique, max_stEngine_unique)
+
+        max_matches = max([row[2] for row in plotter.hash_vars[f"{gs}_profile_stats_{typee}"][1:]])
+        max_non_matches_sum = max([row[3] for row in plotter.hash_vars[f"{gs}_profile_stats_{typee}"][1:]])
+        max_axis_second_plot = max(max_matches, max_non_matches_sum)
+    %>
+    <div style="overflow: hidden; display: flex; flex-direction: row; justify-content: center;">
+    ${plotter.density(id=f"{gs}_profile_stats_{typee}", row_names = True, header = True, fields=[0,4], x_label="Non-Matches Difference",
+                        title=f"{gs_names[gs]} minus Model HPOs difference in {typee.capitalize()}")}
+    ${plotter.scatter2D(id= f'{gs}_profile_stats_{typee}', xAxis= "disease_unique", yAxis="stEngine_unique", header= True, row_names = True, smp_attr = [1],
+                        x_label = f'{gs_names[gs]} Specific', y_label = 'Model Specific', bins=30, 
+                        title=f"Unique HPOs in {typee.capitalize()}",
+                        config = {"setMaxX": max_axis_first_plot, "setMaxY":max_axis_first_plot} )}
+    ${plotter.scatter2D(id= f'{gs}_profile_stats_{typee}', xAxis= "matches", yAxis="non_matches_sum", header= True, row_names = True, smp_attr = [1],
+                        x_label = 'Full and similarity HP matches', y_label = 'Total specifics HPs', bins=30,
+                        title=f"Matches vs Non-Matches in {gs_names[gs]} {typee.capitalize()}",
+                        config = {"setMaxX": max_axis_second_plot, "setMaxY":max_axis_second_plot}  )}
+    </div>
+%endfor
+
+
+<%
+    ontology.load_profiles( gs_profiles[gs], reset_stored=True)
+    hpo_freqs = ontology.get_profiles_terms_frequency(asArray=False, translate=False, count_parentals = True, min_freq = 0.015)
+    plotter.hash_vars[f"paper_term_freq_table_ehrhart"] = copy.deepcopy(hpo_freqs)
+%>
+<div style="overflow: hidden; display: flex; flex-direction: row; justify-content: center;">
+${plotter.ontoplot(id=f"paper_term_freq_table_ehrhart", ontology="ontology", root_node="HP:0000118", reference_node="HP:0000118", height=800, width=800,
+                    title=f"{gs_names[gs]} HPO Terms Frequency", dynamic = True)}
+</div>
+
+<div style="overflow: hidden; display: flex; flex-direction: row; justify-content: center;">
+%for typee in ["abstracts", "papers"]:
+    <%
+        ontology.load_profiles( engine_profiles[gs+typee], reset_stored=True)
+        hpo_freqs = ontology.get_profiles_terms_frequency(asArray=False, translate=False, count_parentals = True, min_freq = 0.015)
+        plotter.hash_vars[f"{gs}_term_freq_table_{typee}"] = copy.deepcopy(hpo_freqs)
+    %>
+    ${plotter.ontoplot(id=f"{gs}_term_freq_table_{typee}", ontology="ontology", root_node="HP:0000118", reference_node="HP:0000118", height=800, width=800,
+                        title=f"stEngine {typee.capitalize()} HPO Terms Frequency", dynamic = True)}
+%endfor
+</div>
+
+
+${ plotter.create_title(f'{gs_names[gs]} Supplementary data', id=f'{gs}_table_from', hlevel=2, indexable=True, clickable=True, t_id=f'{gs}_table_to', clickable_text = '(Click me)') }
+%for typee in ["abstracts", "papers"]:
+    <% 
+        gs_table = f"""<div style="overflow: hidden; display: flex; flex-direction: row; justify-content: center;">
+                            <h1>{gs_names[gs]} {typee} Phenotype</h1>
+                        </div>"""
+        gs_table += plotter.table(id = f'{gs}_table_{typee}', styled='dt', attrib =  {'class' : 'table table-striped'}, text=True, header=True,
+                        custom_buttons = ['copyHtml5', 'excelHtml5', 'csvHtml5', 'pdfHtml5'])
+    %>
+%endfor
+${ plotter.create_collapsable_container(f'{gs}_table_to', gs_table) }

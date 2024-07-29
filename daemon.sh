@@ -212,13 +212,40 @@ elif [ "$2" == "reports" ]; then
 		cohort_analyzer -i $RESULTS_PATH/llm_pmID_profiles.txt -o $RESULTS_PATH/reports/cohort_stEngine/cohort_analyzer -d 0 -p 1 -S "," -m lin -a -H
 		
 elif [ "$2" == "metareport" ]; then
-		cp $CURRENT_PATH"/runs/OMIM_ehrhart/splitpaper/results/llm_pmID_profiles.txt" $METAREPORT_RESULTS_PATH/ehrhart_papers_llm_pmID_profiles.txt
-		cp $CURRENT_PATH"/runs/OMIM_ehrhart/splitabstract/results/llm_pmID_profiles.txt" $METAREPORT_RESULTS_PATH/ehrhart_abstracts_llm_pmID_profiles.txt
-		cat $METAREPORT_RESULTS_PATH/../disease* > $METAREPORT_RESULTS_PATH/all_disease_data
-		cat $METAREPORT_RESULTS_PATH/../phenotype* > $METAREPORT_RESULTS_PATH/all_phenotype_data
-		report_html -d "$METAREPORT_RESULTS_PATH/all_disease_data,$METAREPORT_RESULTS_PATH/all_phenotype_data,$INPUTS_PATH/omim2_hpo_profiles.txt,$METAREPORT_RESULTS_PATH/ehrhart_papers_llm_pmID_profiles.txt,$METAREPORT_RESULTS_PATH/ehrhart_abstracts_llm_pmID_profiles.txt" \
-					-t $REPORTS_TEMPLATES/metareport.txt \
-					-o $METAREPORT_RESULTS_PATH/metareport		
+		source $PYENV/bin/activate #TODO: Remove later
+		export PATH=$PYENV/bin:$PATH
+		HPO_PATH=`semtools -d list | grep HPO`
+		MONDO_PATH=`semtools -d list | grep MONDO`
+
+#		cp $CURRENT_PATH"/runs/OMIM_DO/splitpaper/results/llm_pmID_profiles.txt" $METAREPORT_RESULTS_PATH/do_papers_llm_pmID_profiles.txt
+#		cp $CURRENT_PATH"/runs/OMIM_DO/splitabstract/results/llm_pmID_profiles.txt" $METAREPORT_RESULTS_PATH/do_abstracts_llm_pmID_profiles.txt
+#		cp $CURRENT_PATH"/runs/OMIM_ehrhart/splitpaper/results/llm_pmID_profiles.txt" $METAREPORT_RESULTS_PATH/ehrhart_papers_llm_pmID_profiles.txt
+#		cp $CURRENT_PATH"/runs/OMIM_ehrhart/splitabstract/results/llm_pmID_profiles.txt" $METAREPORT_RESULTS_PATH/ehrhart_abstracts_llm_pmID_profiles.txt
+#		cat $METAREPORT_RESULTS_PATH/../disease* > $METAREPORT_RESULTS_PATH/all_disease_data
+#		cat $METAREPORT_RESULTS_PATH/../phenotype* > $METAREPORT_RESULTS_PATH/all_phenotype_data
+		if [ ! -s $METAREPORT_RESULTS_PATH/pmid_titles ]; then cut -f 1 $METAREPORT_RESULTS_PATH/all_phenotype_data | sort -u | get_pmid_titles.py -i - -o $METAREPORT_RESULTS_PATH/pmid_titles ;fi
+
+		data_paths=`echo -e "
+			$METAREPORT_RESULTS_PATH/all_disease_data,
+			$METAREPORT_RESULTS_PATH/all_phenotype_data,
+			$INPUTS_PATH/omim_hpo_profiles.txt,
+			$INPUTS_PATH/omim2_hpo_profiles.txt,
+			$METAREPORT_RESULTS_PATH/ehrhart_papers_llm_pmID_profiles.txt,
+			$METAREPORT_RESULTS_PATH/ehrhart_abstracts_llm_pmID_profiles.txt,
+			$METAREPORT_RESULTS_PATH/do_papers_llm_pmID_profiles.txt,
+			$METAREPORT_RESULTS_PATH/do_abstracts_llm_pmID_profiles.txt,
+			$QUERIES_PATH/omim_list,$METAREPORT_RESULTS_PATH/pmid_titles
+			" | tr -d [:space:]`
+
+		create_metareport.py -d $data_paths \
+							 -t $REPORTS_TEMPLATES/metareport.txt \
+							 -a $REPORTS_TEMPLATES/subtemplates \
+							 -o $METAREPORT_RESULTS_PATH/metareport \
+							 -O $HPO_PATH \
+							 -M $MONDO_PATH \
+							 -R "(OMIM:[0-9]{6}|OMIMPS:[0-9]{6})"		
+
+
 
 elif [ `echo $2 | cut -f 2 -d "_"` == "check" ]; then 
 		. ~soft_bio_267/initializes/init_autoflow

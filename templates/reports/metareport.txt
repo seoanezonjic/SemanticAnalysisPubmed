@@ -1,9 +1,27 @@
 <%
     import numpy as np
     import pandas as pd
-    from py_semtools.ontology import Ontology
-    ontology = Ontology(file= "/mnt/home/soft/soft_bio_267/programs/x86_64/python_cache/semtools/ontologies/HPO.obo", load_file = True) 
+    import copy
+    gs_names = {"do": "Disease Ontology", "ehrhart": "Ehrhart"}
+    omim_dict = dict(plotter.hash_vars["omim_list"])
+    pmid_titles_dict = dict(plotter.hash_vars["pmid_titles"])
 
+    def get_semantic_similar_hpos(gs_hp_list, model_hp_list, ontology, threshold = 0.8):
+        gs_hp_list_copy = set(copy.deepcopy(gs_hp_list))
+        model_hp_list_copy = set(copy.deepcopy(model_hp_list))
+        similar_pairs = []
+        for model_hp in model_hp_list:
+            model_hp_sims = {gs_hp: ontology.get_similarity(model_hp, gs_hp, sim_type = "lin", ic_type = "resnik") for gs_hp in gs_hp_list}.items()
+            max_sim = max(model_hp_sims, key = lambda x: x[1]) if len(model_hp_sims) > 0 else ["No terms", 0]
+            if max_sim[1] >= threshold:
+                similar_pairs.append(f"{ontology.translate_id(max_sim[0])}-{ontology.translate_id(model_hp)}")
+                gs_hp_list_copy.discard(max_sim[0])
+                model_hp_list_copy.discard(model_hp)
+        return similar_pairs, list(gs_hp_list_copy), list(model_hp_list_copy)
+
+            
+
+    ontology = plotter.hash_vars["ontology"]
     #PMID:21288095	0.4846	0.00028336639274582036	1	1	OMIM:211800	0	0	1	do	abstracts
     plotter.hash_vars["all_phenotype_data"].insert(0, 
     ["pmid", "score", "norm_rank", "abs_rank1", "abs_rank2", "omim_id", "n_newer", "n_older", "repeats", "gold_standard", "type"])
@@ -17,7 +35,7 @@
     for dataset in ["all_phenotype_data", "all_disease_data"]:
         for data_type in ["papers", "abstracts"]:
             for gs_type in ["ehrhart", "do"]:
-                print(f"Processing {dataset} {data_type} {gs_type}")
+                #print(f"Processing {dataset} {data_type} {gs_type}")
                 abs_rankings = np.array(sorted([int(row[3]) for row in plotter.hash_vars[dataset] if row[-2] == gs_type and row[-1] == data_type]))
                 cumms = [ np.mean(abs_rankings <= pos) for pos in range(1, len(abs_rankings)+1)]
                 norm_pos = np.array(range(1, len(cumms)+1)) / len(cumms)
@@ -25,7 +43,6 @@
                 cumm_dist_data = [list(pair)+[gs_type, data_type] for pair in zip(abs_pos, norm_pos, cumms)]
                 percentages= list((np.array([1,2,5,10]) * len(cumm_dist_data) / 100 ).round().astype("int32")-1)
                 percentages_dict = dict(zip([1,2,5,10], percentages))
-                print(percentages_dict)
 
                 if not plotter.hash_vars.get(f"{dataset}_cumm_dist"):
                     plotter.hash_vars[f"{dataset}_cumm_dist"] = top_k_header + cumm_dist_data
@@ -37,7 +54,6 @@
                     plotter.hash_vars[f"{dataset}_topk"] += [[f"{perc}%", cumm_dist_data[row_idx][2], 
                                                          cumm_dist_data[row_idx][3], cumm_dist_data[row_idx][4]] 
                                                          for perc, row_idx in percentages_dict.items()]
-        print(plotter.hash_vars[f"{dataset}_topk"])
     
         topk_order = {"1%": 1, "2%": 2, "5%": 3, "10%": 4}
         for data_type in ["papers", "abstracts"]:
@@ -50,71 +66,58 @@
             
 
     ehrhart_profiles = {row[0]: row[1].split(",") for row in plotter.hash_vars["omim2_hpo_profiles.txt"]}
-    for typee in ["papers", "abstracts"]:
-        engine_profiles = {row[0]: row[1].split(",") for row in plotter.hash_vars[f"ehrhart_{typee}_llm_pmID_profiles.txt"]}
-        plotter.hash_vars[f"ehrhart_table_{typee}"] = [["pmid", "norm_score", "disease_id", "intersected_hpos", "ehrhart_unique", "stEngine_unique"]]
-        for row in [filtered for filtered in plotter.hash_vars["all_phenotype_data"] if typee in filtered and "ehrhart" in filtered]:
-            pmid, score, disease_id = row[0],row[2],row[5]
-            ehrhart_profile_hpos = [ontology.translate_id(term) for term in ehrhart_profiles[disease_id]]
-            engine_profile_hpos = [ontology.translate_id(term) for term in engine_profiles[pmid.replace("PMID:", "")]]
-            intersected_hpos = ",".join(list(set(ehrhart_profile_hpos).intersection(engine_profile_hpos)))
-            ehrhart_unique = ",".join(list(set(ehrhart_profile_hpos).difference(engine_profile_hpos)))
-            stEngine_unique = ",".join(list(set(engine_profile_hpos).difference(ehrhart_profile_hpos)))
-            plotter.hash_vars[f"ehrhart_table_{typee}"].append([pmid, score, disease_id, intersected_hpos, ehrhart_unique, stEngine_unique])
-    #omim2_pmids_and_hpos llm_pmID_profiles.txt
+    do_profiles = {row[0]: row[1].split(",") for row in plotter.hash_vars["omim_hpo_profiles.txt"]}
+    gs_profiles = {"ehrhart": ehrhart_profiles, "do": do_profiles}
+    engine_profiles = {}
+    profile_stats = {}
+
+    for gs in gs_profiles:
+        for typee in ["papers", "abstracts"]:
+            profile_stats[gs+typee] = [["pmid", "omim_id", "matches", "non_matches_sum", "non_matches_dif" ,"disease_unique", "stEngine_unique"]]
+            engine_profiles[gs+typee] = {row[0]: row[1].split(",") for row in plotter.hash_vars[f"{gs}_{typee}_llm_pmID_profiles.txt"]}
+            plotter.hash_vars[f"{gs}_table_{typee}"] = [["title", "norm_score", "omim_id", "full_match_hpos", "semantic_similar_hpos", "disease_unique", "stEngine_unique"]]
+            for row in [filtered for filtered in plotter.hash_vars["all_phenotype_data"] if typee in filtered and gs in filtered]:
+                pmid, score, disease_id = row[0],row[2],row[5]
+
+                gs_profile_hpos = [term for term in gs_profiles[gs][disease_id]]
+                engine_profile_hpos = [term for term in engine_profiles[gs+typee][pmid.replace("PMID:", "")]]
+                
+                score = str(round(float(score),6))
+                pmid = pmid_titles_dict.get(pmid.replace("PMID:",""), pmid)
+                disease_id = omim_dict.get(disease_id, disease_id)
+
+                full_match_HPs_list = list(set(gs_profile_hpos).intersection(engine_profile_hpos))
+                gs_soft_unique_list = list(set(gs_profile_hpos).difference(full_match_HPs_list))
+                stEngine_soft_unique_list = list(set(engine_profile_hpos).difference(full_match_HPs_list))
+                similar_HPs_list, gs_unique_list, stEngine_unique_list = get_semantic_similar_hpos(gs_soft_unique_list, stEngine_soft_unique_list, ontology)
+                
+                profile_stats[gs+typee].append([pmid, disease_id, len(full_match_HPs_list)+len(similar_HPs_list), len(gs_soft_unique_list)+len(stEngine_unique_list), 
+                                        len(gs_soft_unique_list)-len(stEngine_unique_list) ,len(gs_unique_list), len(stEngine_unique_list)])
+
+                full_match_HPs = ",".join([ontology.translate_id(term) for term in full_match_HPs_list])
+                similar_HPs = ",".join(similar_HPs_list)
+                gs_unique = ",".join([ontology.translate_id(term) for term in gs_unique_list])
+                stEngine_unique = ",".join([ontology.translate_id(term) for term in stEngine_unique_list])
+                plotter.hash_vars[f"{gs}_table_{typee}"].append([pmid, score, disease_id, full_match_HPs, similar_HPs, gs_unique, stEngine_unique])
+        
+            plotter.hash_vars[f"{gs}_profile_stats_{typee}"] = profile_stats[gs+typee]
 %>
-<div style="overflow: hidden; display: flex; flex-direction: row; justify-content: center;">
-    <h1>Ehrhart Abstracts Phenotype</h1>
-</div>
-<div style="overflow: hidden; display: flex; flex-direction: row; justify-content: center;">
-    ${ plotter.table(id = 'ehrhart_table_abstracts', styled='dt', attrib =  {'class' : 'table table-striped'}, text=True, header=True,
-                    custom_buttons = ['copyHtml5', 'excelHtml5', 'csvHtml5', 'pdfHtml5'])}
-</div>
-<div style="overflow: hidden; display: flex; flex-direction: row; justify-content: center;">
-    <h1>Ehrhart Papers Phenotype</h1>
-</div>
-<div style="overflow: hidden; display: flex; flex-direction: row; justify-content: center;">
-    ${ plotter.table(id = 'ehrhart_table_papers', styled='dt', attrib =  {'class' : 'table table-striped'}, text=True, header=True,
-                    custom_buttons = ['copyHtml5', 'excelHtml5', 'csvHtml5', 'pdfHtml5'])}
-</div>
 
-<div style="overflow: hidden; display: flex; flex-direction: row; justify-content: center;">
-    ${ plotter.boxplot(id = 'all_disease_data', header = True, row_names = True, height = 500, width= 900, title = "Disease rankings in Ehrhart vs Disease Ontology",
-                        smp_attr = [5,6,7,8], fields = [0,2], x_label = "Normalized Rankings",
-                        group = ["gold_standard", "type"],
-                        config={"graphOrientation":"vertical"}
-    )}
-</div>
-<div style="overflow: hidden; display: flex; flex-direction: row; justify-content: center;">    
-    ${ plotter.boxplot(id = 'all_phenotype_data', header = True, row_names = True, height = 500, width= 900, title = "Phenotype rankings in Ehrhart vs Disease Ontology",
-                        smp_attr = [5,9,10], fields = [0,2], x_label = "Normalized Rankings",
-                        group = ["gold_standard", "type"],
-                        config={"graphOrientation":"vertical"}
-    )}
-</div>
 
+<% plotter.set_header() %>
+
+${ plotter.create_title('General stats and comparisons between gold standards', id='gs_general_from', hlevel=1, indexable=True, clickable=True, t_id='gs_general_to', clickable_text = '(Click me)') }
 <% 
-    idx = 0
-    titles = {"all_phenotype_data_abstracts_topk": "Top-K True Positive Rate of Phenotypes in Abstracts",
-              "all_phenotype_data_papers_topk": "Top-K True Positive Rate of Phenotypes in Papers",
-              "all_disease_data_abstracts_topk": "Top-K True Positive Rate of Diseases in Abstracts",
-              "all_disease_data_papers_topk": "Top-K True Positive Rate of Diseases in Papers"}
-    h1title = "Disease TopK Rankings in Ehrhart vs Disease Ontology"
- %>
-%for barplosito in ["all_disease_data_abstracts_topk", "all_disease_data_papers_topk", "all_phenotype_data_abstracts_topk", "all_phenotype_data_papers_topk"]:
-    %if idx % 2 == 0:
-        <div style="overflow: hidden; display: flex; flex-direction: row; justify-content: center;">
-            <h3>${h1title}</h3>
-        </div>
-        <div style="overflow: hidden; display: flex; flex-direction: row; justify-content: center;">
-    %endif
-    ${plotter.barplot(id=barplosito, header=True, row_names=True, height = 500, width= 500,
-                        title=titles[barplosito], x_label="True Positive Rate",
-                        config= { "graphOrientation": "vertical", "setMinX": 0, "setMaxX": 1}
-    )}
-    %if idx % 2 == 1:
-        </div>
-    %endif
-    <% idx += 1 %>
-    <% h1title = "Phenotype TopK Rankings in Ehrhart vs Disease Ontology" %>
+    gs_general = (plotter.renderize_child_template(plotter.get_internal_template('meta_general.txt'), gs=gs))
+%>
+${ plotter.create_collapsable_container('gs_general_to', gs_general, display="visible") }
+
+
+%for gs in ["do", "ehrhart"]:
+    ${ plotter.create_title(f'{gs_names[gs]} specific stats', id=f'{gs}_from', hlevel=1, indexable=True, clickable=True, t_id=f'{gs}_to', clickable_text = '(Click me)') }
+    <% 
+        gs_spec = (plotter.renderize_child_template(plotter.get_internal_template('meta_gs_spe.txt'), gs=gs, ontology=ontology, gs_profiles=gs_profiles, 
+                    engine_profiles=engine_profiles, copy=copy, gs_names=gs_names))
+    %>
+    ${ plotter.create_collapsable_container(f'{gs}_to', gs_spec, display="visible") }
 %endfor
