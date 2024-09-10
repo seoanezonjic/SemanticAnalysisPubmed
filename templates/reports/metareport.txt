@@ -2,9 +2,14 @@
     import numpy as np
     import pandas as pd
     import copy
+    import pprint
     gs_names = {"do": "Disease Ontology", "ehrhart": "Ehrhart"}
-    omim_dict = dict(plotter.hash_vars["omim_list"])
-    pmid_titles_dict = dict(plotter.hash_vars["pmid_titles"])
+
+    ontology = plotter.hash_vars["ontology"]
+    omim_to_mondo_dict = plotter.hash_vars["omim_to_mondo_dict"]
+
+    omim_code_to_name_dict = dict(plotter.hash_vars["omim_list"])
+    pmid_to_title_dict = dict(plotter.hash_vars["pmid_titles"])
 
     def get_semantic_similar_hpos(gs_hp_list, model_hp_list, ontology, threshold = 0.8):
         gs_hp_list_copy = set(copy.deepcopy(gs_hp_list))
@@ -19,52 +24,56 @@
                 model_hp_list_copy.discard(model_hp)
         return similar_pairs, list(gs_hp_list_copy), list(model_hp_list_copy)
 
-            
+        
+    all_both_data = ([["pmid", "score", "norm_rank", "abs_rank1", "abs_rank2", "omim_id", "dataset", "doc_type", "bench_type"]] +
+                                        [ [row[0],row[1],row[2],row[3],row[4],row[5],row[9],row[10], "phenotype"] for row in plotter.hash_vars["all_phenotype_data"]] + 
+                                        [ [row[0],row[1],row[2],row[3],row[4],row[5],row[7],row[8], "disease"] for row in plotter.hash_vars["all_disease_data"]]
+    )
+    formatter = {"do":"DO", "ehrhart": "Ehr", "abstracts": "Abs", "papers": "Full"}
+    for row_idx in range(len(all_both_data)):
+        for col_idx in range(len(all_both_data[0])):
+            all_both_data[row_idx][col_idx] = formatter.get(all_both_data[row_idx][col_idx], all_both_data[row_idx][col_idx])     
+    plotter.hash_vars["all_both_data"] = all_both_data
 
-    ontology = plotter.hash_vars["ontology"]
-    #PMID:21288095	0.4846	0.00028336639274582036	1	1	OMIM:211800	0	0	1	do	abstracts
-    plotter.hash_vars["all_phenotype_data"].insert(0, 
-    ["pmid", "score", "norm_rank", "abs_rank1", "abs_rank2", "omim_id", "n_newer", "n_older", "repeats", "gold_standard", "type"])
-
-    #PMID:23785305	0.9742591878001088	0.006666666666666667	2	2	OMIM:107600	1	ehrhart	papers
-    plotter.hash_vars["all_disease_data"].insert(0, 
-    ["pmid", "score", "norm_rank", "abs_rank1", "abs_rank2", "omim_id", "is_gs", "gold_standard", "type"])
-
-    top_k_header = [["topk", "pos", "dist", "gold_standard", "type"]]
-    #Preparing selected top-k data
-    for dataset in ["all_phenotype_data", "all_disease_data"]:
-        for data_type in ["papers", "abstracts"]:
-            for gs_type in ["ehrhart", "do"]:
-                #print(f"Processing {dataset} {data_type} {gs_type}")
-                abs_rankings = np.array(sorted([int(row[3]) for row in plotter.hash_vars[dataset] if row[-2] == gs_type and row[-1] == data_type]))
+    top_k_header = [["topk", "pos", "dist", "dataset", "doc_type", "bench_type"]]
+    #Preparing selected top-k data and cumulative distribution
+    for bench_type in ["phenotype", "disease"]:
+        for doc_type in ["Full", "Abs"]:
+            for dataset in ["Ehr", "DO"]:
+                print(f"Processing {bench_type} {doc_type} {dataset}")
+                abs_rankings = np.array(sorted([int(row[3]) for row in plotter.hash_vars['all_both_data'] if row[-3] == dataset and row[-2] == doc_type and row[-1] == bench_type]))
                 cumms = [ np.mean(abs_rankings <= pos) for pos in range(1, len(abs_rankings)+1)]
                 norm_pos = np.array(range(1, len(cumms)+1)) / len(cumms)
                 abs_pos = [f"top{k}" for k in list(range(1, len(cumms)+1))] 
-                cumm_dist_data = [list(pair)+[gs_type, data_type] for pair in zip(abs_pos, norm_pos, cumms)]
+                cumm_dist_data = [list(pair)+[dataset, doc_type, bench_type] for pair in zip(abs_pos, norm_pos, cumms)]
                 percentages= list((np.array([1,2,5,10]) * len(cumm_dist_data) / 100 ).round().astype("int32")-1)
                 percentages_dict = dict(zip([1,2,5,10], percentages))
 
-                if not plotter.hash_vars.get(f"{dataset}_cumm_dist"):
-                    plotter.hash_vars[f"{dataset}_cumm_dist"] = top_k_header + cumm_dist_data
-                    plotter.hash_vars[f"{dataset}_topk"] = top_k_header + [[f"{perc}%", cumm_dist_data[row_idx][2], 
-                                                                            cumm_dist_data[row_idx][3], cumm_dist_data[row_idx][4]] 
+                if not plotter.hash_vars.get(f"cumm_dist"):
+                    plotter.hash_vars[f"cumm_dist"] = top_k_header + cumm_dist_data
+                    plotter.hash_vars[f"topk_long"] = top_k_header + [[f"{perc}%", cumm_dist_data[row_idx][2], 
+                                                                            cumm_dist_data[row_idx][3], cumm_dist_data[row_idx][4], cumm_dist_data[row_idx][5]] 
                                                                             for perc, row_idx in percentages_dict.items()]
                 else:
-                    plotter.hash_vars[f"{dataset}_cumm_dist"] += cumm_dist_data
-                    plotter.hash_vars[f"{dataset}_topk"] += [[f"{perc}%", cumm_dist_data[row_idx][2], 
-                                                         cumm_dist_data[row_idx][3], cumm_dist_data[row_idx][4]] 
+                    plotter.hash_vars[f"cumm_dist"] += cumm_dist_data
+                    plotter.hash_vars[f"topk_long"] += [[f"{perc}%", cumm_dist_data[row_idx][2], 
+                                                         cumm_dist_data[row_idx][3], cumm_dist_data[row_idx][4], cumm_dist_data[row_idx][5]] 
                                                          for perc, row_idx in percentages_dict.items()]
     
-        topk_order = {"1%": 1, "2%": 2, "5%": 3, "10%": 4}
-        for data_type in ["papers", "abstracts"]:
-            df = pd.DataFrame([row[:-1] for row in plotter.hash_vars[f"{dataset}_topk"] if data_type in row], columns = ["topk", "dist", "gold_standard"])
-            pivoted = pd.pivot_table(df, index='topk', columns='gold_standard', values='dist', margins=False)
-            pivoted = pivoted.rename(columns={"do":"do", "ehrhart":"ehrhart"})
-            pivoted = pivoted.sort_values(by='topk', key=lambda x: x.map(topk_order))
-            pivoted_list = [["topk", "do", "ehrhart"]] + pivoted.reset_index().values.tolist()
-            plotter.hash_vars[f"{dataset}_{data_type}_topk"] = pivoted_list
+    #Changing topk table from long format to specific wide format for the barplot
+    topk_order = {"1%": 1, "2%": 2, "5%": 3, "10%": 4}
+    df = pd.DataFrame(plotter.hash_vars[f"topk_long"][1:], columns = ["topk", "dist", "dataset", "doc_type", "bench_type"])
+    pivoted = pd.pivot_table(df, index='topk', columns=['dataset', 'doc_type', 'bench_type'], values='dist', margins=False)
+    pivoted = pivoted.rename(columns={"do":"do", "ehrhart":"ehrhart"})
+    pivoted = pivoted.sort_values(by='topk', key=lambda x: x.map(topk_order))
+    var_attr_names = ["dataset", "doc_type", "bench_type"]
+    var_attr = [[var_attr_names[idx]]+list(subl) for idx, subl in enumerate(zip(*[i for i in pivoted.columns])) ]
+    rows = [[i for i in row] for row in pivoted.itertuples()]
+    new_header = [["topK"] + [f"sample{i}" for i in range(1,len(rows[0]))]]
+    new_table = new_header + var_attr + rows
+    plotter.hash_vars[f"topk_wide"] = new_table
             
-
+    #Getting profiles phenotype stats table and data suitable for rontoplot
     ehrhart_profiles = {row[0]: row[1].split(",") for row in plotter.hash_vars["omim2_hpo_profiles.txt"]}
     do_profiles = {row[0]: row[1].split(",") for row in plotter.hash_vars["omim_hpo_profiles.txt"]}
     gs_profiles = {"ehrhart": ehrhart_profiles, "do": do_profiles}
@@ -83,8 +92,8 @@
                 engine_profile_hpos = [term for term in engine_profiles[gs+typee][pmid.replace("PMID:", "")]]
                 
                 score = str(round(float(score),6))
-                pmid = pmid_titles_dict.get(pmid.replace("PMID:",""), pmid)
-                disease_id = omim_dict.get(disease_id, disease_id)
+                pmid = pmid_to_title_dict.get(pmid.replace("PMID:",""), pmid)
+                disease_id = omim_code_to_name_dict.get(disease_id, disease_id)
 
                 full_match_HPs_list = list(set(gs_profile_hpos).intersection(engine_profile_hpos))
                 gs_soft_unique_list = list(set(gs_profile_hpos).difference(full_match_HPs_list))

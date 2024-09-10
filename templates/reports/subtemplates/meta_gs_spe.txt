@@ -47,9 +47,12 @@ ${plotter.ontoplot(id=f"paper_term_freq_table_ehrhart", ontology="ontology", roo
 
 
 ${ plotter.create_title(f'{gs_names[gs]} Supplementary data', id=f'{gs}_table_from', hlevel=2, indexable=True, clickable=True, t_id=f'{gs}_table_to', clickable_text = '(Click me)') }
+<%
+    gs_table = ""
+%> 
 %for typee in ["abstracts", "papers"]:
     <% 
-        gs_table = f"""<div style="overflow: hidden; display: flex; flex-direction: row; justify-content: center;">
+        gs_table += f"""<div style="overflow: hidden; display: flex; flex-direction: row; justify-content: center;">
                             <h1>{gs_names[gs]} {typee} Phenotype</h1>
                         </div>"""
         gs_table += plotter.table(id = f'{gs}_table_{typee}', styled='dt', attrib =  {'class' : 'table table-striped'}, text=True, header=True,

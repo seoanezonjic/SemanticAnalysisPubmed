@@ -1,40 +1,17 @@
 <div style="overflow: hidden; display: flex; flex-direction: row; justify-content: center;">
-    ${ plotter.boxplot(id = 'all_disease_data', header = True, row_names = True, height = 500, width= 900, title = "Disease rankings in Ehrhart vs Disease Ontology",
+    ${ plotter.boxplot(id = 'all_both_data', header = True, row_names = True, height = 500, width= 800, title = "Disease and Phenotype rankings in Ehrhart vs Disease Ontology",
                         smp_attr = [5,6,7,8], fields = [0,2], x_label = "Normalized Rankings",
-                        group = ["gold_standard", "type"],
-                        config={"graphOrientation":"vertical"}
-    )}
-</div>
-<div style="overflow: hidden; display: flex; flex-direction: row; justify-content: center;">    
-    ${ plotter.boxplot(id = 'all_phenotype_data', header = True, row_names = True, height = 500, width= 900, title = "Phenotype rankings in Ehrhart vs Disease Ontology",
-                        smp_attr = [5,9,10], fields = [0,2], x_label = "Normalized Rankings",
-                        group = ["gold_standard", "type"],
+                        group = ["dataset", "doc_type", "bench_type"],
                         config={"graphOrientation":"vertical"}
     )}
 </div>
 
-<% 
-    idx = 0
-    titles = {"all_phenotype_data_abstracts_topk": "Top-K True Positive Rate of Phenotypes in Abstracts",
-              "all_phenotype_data_papers_topk": "Top-K True Positive Rate of Phenotypes in Papers",
-              "all_disease_data_abstracts_topk": "Top-K True Positive Rate of Diseases in Abstracts",
-              "all_disease_data_papers_topk": "Top-K True Positive Rate of Diseases in Papers"}
-    h1title = "Disease TopK Rankings in Ehrhart vs Disease Ontology"
- %>
-%for barplosito in ["all_disease_data_abstracts_topk", "all_disease_data_papers_topk", "all_phenotype_data_abstracts_topk", "all_phenotype_data_papers_topk"]:
-    %if idx % 2 == 0:
-        <div style="overflow: hidden; display: flex; flex-direction: row; justify-content: center;">
-            <h3>${h1title}</h3>
-        </div>
-        <div style="overflow: hidden; display: flex; flex-direction: row; justify-content: center;">
-    %endif
-    ${plotter.barplot(id=barplosito, header=True, row_names=True, height = 500, width= 500,
-                        title=titles[barplosito], x_label="True Positive Rate",
-                        config= { "graphOrientation": "vertical", "setMinX": 0, "setMaxX": 1}
-    )}
-    %if idx % 2 == 1:
-        </div>
-    %endif
-    <% idx += 1 %>
-    <% h1title = "Phenotype TopK Rankings in Ehrhart vs Disease Ontology" %>
-%endfor
+<div style="overflow: hidden; display: flex; flex-direction: row; justify-content: center;">
+${plotter.barplot(id="topk_wide", header=True, row_names=True, height = 500, width= 800,
+                    title="Disease and Phenotype TopK Rankings in Ehrhart vs Disease Ontology", x_label="True Positive Rate",
+                    var_attr = [1,2,3], transpose = False,
+                    config= { "graphOrientation": "vertical", "setMinX": 0, "setMaxX": 1, 
+                              'groupingFactors': ['dataset', 'doc_type'],
+                              'segregateSamplesBy': ['bench_type']}
+)}
+</div>
