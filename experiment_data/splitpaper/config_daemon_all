@@ -1,0 +1,35 @@
+export RUN_NAME="OMIM_ALL/splitpaper"
+export ZEROBENCH_GOLD_STANDARD="omim_pubmed_profiles.txt"
+export GOLD_STANDARDS="omim omim2 mondo" #export GOLD_STANDARDS="omim omim2 mondo"
+export PREFILTER_PMIDS_FILE=""
+export METAREPORT_TAG="all.papers"
+
+export CORPUS_PATH="/mnt2/fscratch/users/bio_267_uma/jperezg/papers/downloaded"
+
+export PUBMED_CHUNKSIZE=5000
+export PUBMED_CHUNKSIZE_FILT=5000
+export SOFT_MIN_SIMILARITY=0.6
+export HARD_MIN_SIMILARITY=0.7
+export TOP_K=5
+
+export ENGINE_AUTOFLOW_TEMPLATE="wf_papers.af"
+
+export SPLITTED="-s"
+export PAPER="-p"
+export EQUIVALENCES="-e $INPUTS_PATH/PMC-PMID_equivalencies"
+
+export GPU_DEVICES="cuda:0-cuda:1-cuda:2-cuda:3"   #"cuda:0-cuda:1"
+export N_GPUs="gres=gpu:"`echo $GPU_DEVICES | tr "-" "\n" | grep "cuda" | wc -l`
+export USE_GPU_FOR_SIM_CALC="--use_gpu_for_sim_calculation"
+
+
+
+#CREATE SEVERAL CORPUS BALANCED-FILLED FOLDERS TO DRISTIBUTE THE EMBEDDING AND SIM CALCULATION PROCESS IN SEVERAL NODES
+export PARALLEL_FOLDERS_BASENAME="chunk"
+export FOLDERS_TO_PARALLELIZE="${PARALLEL_FOLDERS_BASENAME}0;${PARALLEL_FOLDERS_BASENAME}1;${PARALLEL_FOLDERS_BASENAME}2;${PARALLEL_FOLDERS_BASENAME}3;${PARALLEL_FOLDERS_BASENAME}4;${PARALLEL_FOLDERS_BASENAME}5"
+export TSV_FOLDERS=`echo $FOLDERS_TO_PARALLELIZE | tr ";" "-"`
+export PARALLEL_FOLDERS_ARRAY=(${FOLDERS_TO_PARALLELIZE//;/ })
+export N_PARALLEL_FOLDERS=${#PARALLEL_FOLDERS_ARRAY[@]}
+
+
+export BENCH_PACKAGE_SIZE=15
