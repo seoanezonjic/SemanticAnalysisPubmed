@@ -245,7 +245,15 @@ elif [ "$2" == "metareport" ]; then
 							 -M $MONDO_PATH \
 							 -R "(OMIM:[0-9]{6}|OMIMPS:[0-9]{6})"		
 
+elif [ "$2" == "proof" ]; then
+		source $PYENV/bin/activate #TODO: Remove later
+		export PATH=$PYENV/bin:$PATH
+		#Remove line below when result from this run are available
+		#tmp_pubmed_path="/mnt/home/users/bio_267_uma/jperezg/projects/LLMs/SemanticAnalysisPubmed/previous_results/results_before_july_24/postgambazo/all_pmids/splitabstract_hard07_11_06_24"
+		grep "601321" $INPUTS_PATH/omim_hpo_profiles.txt | cut -f 2 | tr "," "\n" > $RUN_TMP_PATH/noonan_profile.txt
 
+		mkdir -p $RESULTS_PATH/proof_of_concept
+		get_sorted_profs -r $RUN_TMP_PATH/noonan_profile.txt -S "," -P $RESULTS_PATH/llm_pmID_profiles.txt -d 0 -p 1 -H -L "40,40" -o $RESULTS_PATH/proof_of_concept.html
 
 elif [ `echo $2 | cut -f 2 -d "_"` == "check" ]; then 
 		. ~soft_bio_267/initializes/init_autoflow
