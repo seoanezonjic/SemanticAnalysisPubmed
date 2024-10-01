@@ -1,11 +1,10 @@
 <%
     import pandas as pd
-    variables_dict=dict(plotter.hash_vars["variables.txt"])
-    disease=variables_dict["disease"]
-    plotter.hash_vars[f"{disease}.txt"].sort(key=lambda row: float(row[1]), reverse=True) 
-    plotter.hash_vars[f"{disease}.txt"] = plotter.hash_vars[f"{disease}.txt"][0:50]
+    disease=plotter.hash_vars["disease"].replace("_profile", "").capitalize()
+    plotter.hash_vars["candidates_sims"].sort(key=lambda row: float(row[1]), reverse=True) 
+    plotter.hash_vars["candidates_sims"] = plotter.hash_vars["candidates_sims"][0:50]
     
-    pubmed_ids_and_sims = pd.DataFrame(plotter.hash_vars[f"{disease}.txt"], columns=["pubmed_id", "similarity"])
+    pubmed_ids_and_sims = pd.DataFrame(plotter.hash_vars["candidates_sims"], columns=["pubmed_id", "similarity"])
     pubmed_ids_and_titles = pd.DataFrame(plotter.hash_vars["pubmed_ids_and_titles"], columns=["pubmed_id", "title", "article-type", "article-category"])
     
     pubmed_ids_sims_and_titles = pd.merge(pubmed_ids_and_sims, pubmed_ids_and_titles, on="pubmed_id", how="inner")
@@ -21,7 +20,15 @@ ${plotter.prettify_div(disease_div)}
 
 <div class="container-fluid row-offcanvas nopadding">
     <div class="col-sm-7 nopadding">
-        ${plotter.embed_html(f"./proof_of_concept/{disease}.html")}
+        <div style="width: 90%; background-color:#ecf0f1; margin: 0 auto;"> 
+            <h1 style="text-align: center; background-color:#d6eaf8">Similarity matrix</h1>
+            ${plotter.similarity_matrix_plot( id= "similarity_matrix", header= True, row_names= True )}
+        </div>
+
+        <div style="width: 90%; background-color:#ecf0f1; margin: 0 auto;"> 
+            <h1 style="text-align: center; background-color:#d6eaf8">Negative terms matrix</h1>
+            ${plotter.similarity_matrix_plot( id= "negative_matrix", header= True, row_names= True )}
+        </div>
     </div>
 
     <div class="col-sm-5 nopadding">
