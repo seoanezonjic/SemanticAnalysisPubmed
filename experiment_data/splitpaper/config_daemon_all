@@ -22,7 +22,7 @@ export GPU_DEVICES="cuda:0-cuda:1-cuda:2-cuda:3"   #"cuda:0-cuda:1"
 export N_GPUs="gres=gpu:"`echo $GPU_DEVICES | tr "-" "\n" | grep "cuda" | wc -l`
 export USE_GPU_FOR_SIM_CALC="--use_gpu_for_sim_calculation"
 
-
+export TITLE_BLACKLISTED_WORDS="posters;abstracts;annual meeting;conference;congress;oral presentations"
 
 #CREATE SEVERAL CORPUS BALANCED-FILLED FOLDERS TO DRISTIBUTE THE EMBEDDING AND SIM CALCULATION PROCESS IN SEVERAL NODES
 export PARALLEL_FOLDERS_BASENAME="chunk"

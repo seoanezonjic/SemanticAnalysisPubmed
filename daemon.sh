@@ -39,15 +39,21 @@ export ENGINE_AUTOFLOW_TEMPLATE_PATH=$AUTOFLOW_TEMPLATES/$ENGINE_AUTOFLOW_TEMPLA
 export ZEROBENCH_EXEC_PATH=$FSCRATCH"/SemanticAnalysisPubmed/$RUN_NAME/EXECS_zerobench"
 export ENGINE_EXEC_PATH=$FSCRATCH"/SemanticAnalysisPubmed/$RUN_NAME/EXECS_engine"
 export PROFILES_EXEC_PATH=$FSCRATCH"/SemanticAnalysisPubmed/$RUN_NAME/EXECS_profiles"
+export PROOF_EXEC_PATH=$FSCRATCH"/SemanticAnalysisPubmed/$RUN_NAME/EXECS_proof"
+
 echo -e "engine_wf\t$ENGINE_EXEC_PATH" > $CURRENT_PATH/workflow_paths
 echo -e "bench_wf\t$PROFILES_EXEC_PATH" >> $CURRENT_PATH/workflow_paths
 echo -e "zerobench_wf\t$ZEROBENCH_EXEC_PATH" >> $CURRENT_PATH/workflow_paths
+echo -e "proof_wf\t$PROOF_EXEC_PATH" >> $CURRENT_PATH/workflow_paths
 
 mkdir -p $RESULTS_PATH; mkdir -p $RESULTS_PATH/reports; mkdir -p $RESULTS_PATH/reports/cohort_stEngine; mkdir -p $INPUTS_PATH ; mkdir -p $TMP_PATH
 mkdir -p $PUBMED_FILES_STATS_PATH; mkdir -p $AUTOFLOW_TEMPLATES; mkdir -p $REPORTS_TEMPLATES; mkdir -p $QUERIES_PATH ; mkdir -p $TEMPLATES_PATH; 
 mkdir -p $RUN_FOLDER; mkdir -p $RUN_TMP_PATH; mkdir -p $RUN_INPUTS_PATH; mkdir -p $METAREPORT_RESULTS_PATH
 #OTHER VARIABLES
 export database_ids="OMIM ORPHA"
+
+#BLACKLISTED WORDS FOR PROOF OF CONCEPT HEATMAP
+echo -e $TITLE_BLACKLISTED_WORDS | tr ";" "\n" > $RUN_TMP_PATH/blacklisted_words.txt
 
 
 if [ "$2" == "goldstandard" ]; then #DOWNLOAD AND PREPARE GOLD STANDARDS TO ASSESS MODEL PERFORMANCE
@@ -126,9 +132,12 @@ elif [ "$2" == "engine_wf" ] ; then
 			\\$tmp_path=$RUN_TMP_PATH,
 			\\$report_templates_path=$REPORTS_TEMPLATES,
 			\\$prefilter_pmids_file=$PREFILTER_PMIDS_FILE,
-			\\$postfilter_chunksize=$PUBMED_CHUNKSIZE_FILT,		       
+			\\$postfilter_chunksize=$PUBMED_CHUNKSIZE_FILT,
+			\\$title_blacklisted_words=$RUN_TMP_PATH/blacklisted_words.txt		       
 			" | tr -d [:space:]`
 		AutoFlow -e -w $ENGINE_AUTOFLOW_TEMPLATE_PATH -V $variables -o $ENGINE_EXEC_PATH -m 20gb -t 3-00:00:00 -n cal -c 10 -L $3
+
+
 
 elif [ "$2" == "prepare_bench" ]; then
 		for GOLD in $GOLD_STANDARDS; do
@@ -245,15 +254,30 @@ elif [ "$2" == "metareport" ]; then
 							 -M $MONDO_PATH \
 							 -R "(OMIM:[0-9]{6}|OMIMPS:[0-9]{6})"		
 
-elif [ "$2" == "proof" ]; then
-		source $PYENV/bin/activate #TODO: Remove later
-		export PATH=$PYENV/bin:$PATH
-		#Remove line below when result from this run are available
-		#tmp_pubmed_path="/mnt/home/users/bio_267_uma/jperezg/projects/LLMs/SemanticAnalysisPubmed/previous_results/results_before_july_24/postgambazo/all_pmids/splitabstract_hard07_11_06_24"
-		grep "601321" $INPUTS_PATH/omim_hpo_profiles.txt | cut -f 2 | tr "," "\n" > $RUN_TMP_PATH/noonan_profile.txt
-
+elif [ "$2" == "proof_wf" ]; then
+		source ~soft_bio_267/initializes/init_autoflow
 		mkdir -p $RESULTS_PATH/proof_of_concept
-		get_sorted_profs -r $RUN_TMP_PATH/noonan_profile.txt -S "," -P $RESULTS_PATH/llm_pmID_profiles.txt -d 0 -p 1 -H -L "40,40" -o $RESULTS_PATH/proof_of_concept.html
+
+		grep "601321" $INPUTS_PATH/omim_hpo_profiles.txt | cut -f 2 | tr "," "\n" > $RUN_TMP_PATH/noonan_profile.txt
+		grep "218040" $INPUTS_PATH/omim_hpo_profiles.txt | cut -f 2 | tr "," "\n" > $RUN_TMP_PATH/costello_profile.txt
+		grep "115150" $INPUTS_PATH/omim_hpo_profiles.txt | cut -f 2 | tr "," "\n" > $RUN_TMP_PATH/cfc_profile.txt #cardio-facio-cutaneous syndrome
+		
+		echo $RUN_TMP_PATH/noonan_profile.txt > $RUN_TMP_PATH/diseases_to_proof
+		echo $RUN_TMP_PATH/costello_profile.txt >> $RUN_TMP_PATH/diseases_to_proof
+		echo $RUN_TMP_PATH/cfc_profile.txt >> $RUN_TMP_PATH/diseases_to_proof
+		n_diseases=`wc -l $RUN_TMP_PATH/diseases_to_proof | cut -f 1 -d " "`
+		
+		variables=`echo -e "
+						\\$pyenv=$PYENV,
+						\\$code_path=$CODE_PATH,
+						\\$results_path=$RESULTS_PATH,
+						\\$diseases_range_number=1-$n_diseases,
+						\\$diseases_filepaths=$RUN_TMP_PATH/diseases_to_proof,
+						\\$pubmed_ids_and_titles=$RESULTS_PATH/pubmed_ids_and_titles,
+						\\$report_templates_path=$REPORTS_TEMPLATES
+						" | tr -d [:space:]`
+		
+		AutoFlow -e -w $AUTOFLOW_TEMPLATES/proof.af -V $variables -o $PROOF_EXEC_PATH -m 80gb -t 1-12:00:00 -n cal -c 1 -L $3
 
 elif [ `echo $2 | cut -f 2 -d "_"` == "check" ]; then 
 		. ~soft_bio_267/initializes/init_autoflow

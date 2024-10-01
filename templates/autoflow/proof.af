@@ -1,0 +1,20 @@
+run_sorted_proofs_bin_[$diseases_range_number]){
+    #source ~soft_bio_267/initializes/init_python
+    source $pyenv/bin/activate #TODO: Remove later	
+    current_disase_line=(*)
+    disease_to_analyze_path=`sed "$current_disase_line"'q;d' $diseases_filepaths`
+    disease_name=`basename $disease_to_analyze_path | cut -f 1 -d "."`
+    echo "Running sorted proofs for $disease_name located at $disease_to_analyze_path at line $current_disase_line"
+    mkdir -p proof_of_concept
+    echo -e "disease\t$disease_name" > variables.txt
+    #Define a grep to remove LaTeX and other special characters
+    grep -v -E '\\\(.*\)\\|\\$.*\\$|\\\[.*\\\]|\{{4}\\[a-zA-Z]+{[^{}]*}\}{4}|\\[a-zA-Z]+\s*{[^{}]*}' $pubmed_ids_and_titles | sort -u > pubmed_ids_and_titles
+	?
+	get_sorted_profs -r $disease_to_analyze_path -S "," -P $results_path/llm_pmID_profiles.txt -d 0 -p 1 -H -L "100,50" -o ./proof_of_concept/$disease_name".html"    
+    if [[ ! -s ./proof_of_concept/$disease_name".html" ]]; then exit 1; fi #exit if no results
+    report_html -d "./proof_of_concept/"$disease_name".txt,variables.txt,pubmed_ids_and_titles" \
+                -t $report_templates_path/proof.txt \
+                -o $disease_name
+    #rm pubmed_ids_and_titles
+    #cp $disease_name".html" $results_path/proof_of_concept/$disease_name".html"
+}

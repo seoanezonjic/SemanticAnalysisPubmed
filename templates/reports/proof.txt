@@ -1,0 +1,30 @@
+<%
+    import pandas as pd
+    variables_dict=dict(plotter.hash_vars["variables.txt"])
+    disease=variables_dict["disease"]
+    plotter.hash_vars[f"{disease}.txt"].sort(key=lambda row: float(row[1]), reverse=True) 
+    plotter.hash_vars[f"{disease}.txt"] = plotter.hash_vars[f"{disease}.txt"][0:50]
+    
+    pubmed_ids_and_sims = pd.DataFrame(plotter.hash_vars[f"{disease}.txt"], columns=["pubmed_id", "similarity"])
+    pubmed_ids_and_titles = pd.DataFrame(plotter.hash_vars["pubmed_ids_and_titles"], columns=["pubmed_id", "title", "article-type", "article-category"])
+    
+    pubmed_ids_sims_and_titles = pd.merge(pubmed_ids_and_sims, pubmed_ids_and_titles, on="pubmed_id", how="inner")
+    pubmed_ids_sims_and_titles.drop(columns=["article-type", "article-category"], inplace=True) #convert back to a list of lists and add the header back
+    pubmed_ids_sims_and_titles["similarity"] = pubmed_ids_sims_and_titles["similarity"].astype(float).round(2)
+    pubmed_ids_sims_and_titles["pubmed_id"] = pubmed_ids_sims_and_titles["pubmed_id"].apply(lambda pmid: f"<a href=https://pubmed.ncbi.nlm.nih.gov/{pmid}>{pmid}</a>")
+    plotter.hash_vars[f"supp_info.txt"] = pubmed_ids_sims_and_titles.values.tolist()
+    plotter.hash_vars[f"supp_info.txt"].insert(0, ["pubmed_id", "similarity", "title"])
+%>
+
+<%  disease_div = f"<h1> {disease} Syndrome</h1>"   %>
+${plotter.prettify_div(disease_div)}
+
+<div class="container-fluid row-offcanvas nopadding">
+    <div class="col-sm-7 nopadding">
+        ${plotter.embed_html(f"./proof_of_concept/{disease}.html")}
+    </div>
+
+    <div class="col-sm-5 nopadding">
+        ${plotter.table(id="supp_info.txt", styled="dt", text=True, header=True, attrib = {'class' : 'table'}, custom_buttons = ['copyHtml5', 'excelHtml5', 'csvHtml5', 'pdfHtml5'])}
+    </div>
+</div>

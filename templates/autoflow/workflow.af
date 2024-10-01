@@ -19,7 +19,8 @@ get_abstracts){
 
 	export PATH=$code_path:$PATH #TODO: Remove later
 	source $pyenv/bin/activate #TODO: Remove later
-	
+	export PATH=$pyenv/bin:$PATH	
+
 	n_cpus=$(([cpu] - 3))
 	mkdir indexes
 	?
@@ -122,14 +123,31 @@ aggregate_results){
 	aggregate_column_data -i llm_pmID_profiles_cleaned_2cols.txt -x 1 -a 2 > llm_pmID_profiles_cleaned.txt
 	if [ ! -s llm_pmID_profiles_cleaned.txt ]; then exit 1; fi #exit if no results
 
-	if [ -s pubmed_metadata_full ]; then rm pubmed_metadata_full; fi
+	if [ -s pubmed_metadata_full ]; then rm pubmed_metadata_full; rm pubmed_ids_and_titles_raw; fi
 	for filename in get_abstracts)/indexes/* ; do
 		zcat $filename | cut -f 1,3,4,5,6,7 >> pubmed_metadata_full
+		zcat $filename | cut -f 1,8,9,10 | awk 'BEGIN{FS="\t"}{if(NF == 4 && $1!="" && $2!="" && $3!="" && $4!="") print $0}' >> pubmed_ids_and_titles_raw
 	done
+	if [[ -s $title_blacklisted_words ]]; then
+		#Line below outputs to pubmed_ids_and_titles
+		awk 'BEGIN{FS="\t"}{gsub(/^[ \t]+/,"",$3);gsub(/[ \t]+$/,"",$3)};gsub(/^[ \t]+/,"",$4);gsub(/[ \t]+$/,"",$4)};if(NF == 4 && $1!="" && $2!="" && $3!="" && $4!="") print $0}' pubmed_ids_and_titles_raw > pubmed_ids_and_titles
+		
+		#Filtering first blacklisted words in title
+		filter_by_list -f pubmed_ids_and_titles -c 2 -t $title_blacklisted_words -o ./ --prefix blacklisted_ --not_exact_match
+		cut -f 1 blacklisted_pubmed_ids_and_titles > blacklisted_pmids
+		#Filtering now blacklisted words in article-category
+		filter_by_list -f pubmed_ids_and_titles -c 4 -t $title_blacklisted_words -o ./ --prefix blacklisted_ --not_exact_match
+		cut -f 1 blacklisted_pubmed_ids_and_titles > blacklisted_pmids
+		sort -u blacklisted_pmids > blacklisted_pmids_unique
+
+		grep -vwf blacklisted_pmids_unique llm_pmID_profiles_cleaned.txt > llm_pmID_profiles_cleaned_filtered.txt
+		rm llm_pmID_profiles_cleaned.txt; mv llm_pmID_profiles_cleaned_filtered.txt llm_pmID_profiles_cleaned.txt
+	fi
 	
 	cp hard_filtered_scores $results_path/llm_filtered_scores
 	cp llm_pmID_profiles_with_cosine_sim.txt $results_path/llm_pmID_profiles_with_cosine_sim.txt
 	cp llm_pmID_profiles_cleaned.txt $results_path/llm_pmID_profiles.txt
 	cp llm_term_profiles.txt $results_path/llm_term_profiles.txt
 	cp pubmed_metadata_full $results_path/pubmed_metadata
+	cp pubmed_ids_and_titles_raw $results_path/pubmed_ids_and_titles
 }
