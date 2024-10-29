@@ -1,17 +1,27 @@
 <div style="overflow: hidden; display: flex; flex-direction: row; justify-content: center;">
     ${ plotter.boxplot(id = 'all_both_data', header = True, row_names = True, height = 500, width= 800, title = "Disease and Phenotype rankings in Ehrhart vs Disease Ontology",
                         smp_attr = [5,6,7,8], fields = [0,2], x_label = "Normalized Rankings",
-                        group = ["dataset", "doc_type", "bench_type"],
-                        config={"graphOrientation":"vertical"}
+                        group = ["doc_type", "dataset", "bench_type"],
+                        config={"graphOrientation":"vertical", "setMinX": 0, "setMaxX": 1}
     )}
 </div>
 
 <div style="overflow: hidden; display: flex; flex-direction: row; justify-content: center;">
 ${plotter.barplot(id="topk_wide", header=True, row_names=True, height = 500, width= 800,
-                    title="Disease and Phenotype TopK Rankings in Ehrhart vs Disease Ontology", x_label="True Positive Rate",
+                    title="Disease and Phenotype percentual TopK Rankings in Ehrhart vs Disease Ontology", x_label="True Positive Rate",
                     var_attr = [1,2,3], transpose = False,
                     config= { "graphOrientation": "vertical", "setMinX": 0, "setMaxX": 1, 
-                              'groupingFactors': ['dataset', 'doc_type'],
+                              'groupingFactors': ['doc_type', 'dataset'],
+                              'segregateSamplesBy': ['bench_type']}
+)}
+</div>
+
+<div style="overflow: hidden; display: flex; flex-direction: row; justify-content: center;">
+${plotter.barplot(id="topk_abs_wide", header=True, row_names=True, height = 500, width= 800,
+                    title="Disease and Phenotype absolute TopK Rankings in Ehrhart vs Disease Ontology", x_label="True Positive Rate",
+                    var_attr = [1,2,3], transpose = False,
+                    config= { "graphOrientation": "vertical", "setMinX": 0, "setMaxX": 1, 
+                              'groupingFactors': ['doc_type', 'dataset'],
                               'segregateSamplesBy': ['bench_type']}
 )}
 </div>

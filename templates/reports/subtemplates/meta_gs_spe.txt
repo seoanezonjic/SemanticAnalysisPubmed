@@ -26,11 +26,11 @@
 <%
     ontology.load_profiles( gs_profiles[gs], reset_stored=True)
     hpo_freqs = ontology.get_profiles_terms_frequency(asArray=False, translate=False, count_parentals = True, min_freq = 0.015)
-    plotter.hash_vars[f"paper_term_freq_table_ehrhart"] = copy.deepcopy(hpo_freqs)
+    plotter.hash_vars[f"ground_truth_term_freq_table_{gs}"] = copy.deepcopy(hpo_freqs)
 %>
 <div style="overflow: hidden; display: flex; flex-direction: row; justify-content: center;">
-${plotter.ontoplot(id=f"paper_term_freq_table_ehrhart", ontology="ontology", root_node="HP:0000118", reference_node="HP:0000118", height=800, width=800,
-                    title=f"{gs_names[gs]} HPO Terms Frequency", dynamic = True)}
+${plotter.ontoplot(id=f"ground_truth_term_freq_table_{gs}", ontology="ontology", root_node="HP:0000118", reference_node="HP:0000118", 
+                    height=800, width=800, title=f"{gs_names[gs]} HPO Terms Frequency (Ground truth)", dynamic = True)}
 </div>
 
 <div style="overflow: hidden; display: flex; flex-direction: row; justify-content: center;">
@@ -40,8 +40,8 @@ ${plotter.ontoplot(id=f"paper_term_freq_table_ehrhart", ontology="ontology", roo
         hpo_freqs = ontology.get_profiles_terms_frequency(asArray=False, translate=False, count_parentals = True, min_freq = 0.015)
         plotter.hash_vars[f"{gs}_term_freq_table_{typee}"] = copy.deepcopy(hpo_freqs)
     %>
-    ${plotter.ontoplot(id=f"{gs}_term_freq_table_{typee}", ontology="ontology", root_node="HP:0000118", reference_node="HP:0000118", height=800, width=800,
-                        title=f"stEngine {typee.capitalize()} HPO Terms Frequency", dynamic = True)}
+    ${plotter.ontoplot(id=f"{gs}_term_freq_table_{typee}", ontology="ontology", root_node="HP:0000118", reference_node="HP:0000118", 
+                        height=800, width=800, title=f"stEngine {typee.capitalize()} HPO Terms Frequency for {gs_names[gs]}", dynamic = True)}
 %endfor
 </div>
 
@@ -53,7 +53,7 @@ ${ plotter.create_title(f'{gs_names[gs]} Supplementary data', id=f'{gs}_table_fr
 %for typee in ["abstracts", "papers"]:
     <% 
         gs_table += f"""<div style="overflow: hidden; display: flex; flex-direction: row; justify-content: center;">
-                            <h1>{gs_names[gs]} {typee} Phenotype</h1>
+                            <h1>{gs_names[gs]} {typee}. Matched phenotypes and rankings of the model with respect to the Ground truth </h1>
                         </div>"""
         gs_table += plotter.table(id = f'{gs}_table_{typee}', styled='dt', attrib =  {'class' : 'table table-striped'}, text=True, header=True,
                         custom_buttons = ['copyHtml5', 'excelHtml5', 'csvHtml5', 'pdfHtml5'])

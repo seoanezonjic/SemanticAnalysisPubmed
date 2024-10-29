@@ -3,13 +3,19 @@
     import pandas as pd
     import copy
     import pprint
-    gs_names = {"do": "Disease Ontology", "ehrhart": "Ehrhart"}
 
-    ontology = plotter.hash_vars["ontology"]
-    omim_to_mondo_dict = plotter.hash_vars["omim_to_mondo_dict"]
-
-    omim_code_to_name_dict = dict(plotter.hash_vars["omim_list"])
-    pmid_to_title_dict = dict(plotter.hash_vars["pmid_titles"])
+    ##### FUNCTIONS 
+    def transform_from_long_to_wide(table, topk_order_dict):
+        df = pd.DataFrame(table, columns = ["topk", "dist", "dataset", "doc_type", "bench_type"])
+        pivoted = pd.pivot_table(df, index='topk', columns=['dataset', 'doc_type', 'bench_type'], values='dist', margins=False)
+        pivoted = pivoted.rename(columns={"do":"do", "ehrhart":"ehrhart"})
+        pivoted = pivoted.sort_values(by='topk', key=lambda x: x.map(topk_order_dict))
+        var_attr_names = ["dataset", "doc_type", "bench_type"]
+        var_attr = [[var_attr_names[idx]]+list(subl) for idx, subl in enumerate(zip(*[i for i in pivoted.columns])) ]
+        rows = [[i for i in row] for row in pivoted.itertuples()]
+        new_header = [["topK"] + [f"sample{i}" for i in range(1,len(rows[0]))]]
+        new_table = new_header + var_attr + rows
+        return new_table
 
     def get_semantic_similar_hpos(gs_hp_list, model_hp_list, ontology, threshold = 0.8):
         gs_hp_list_copy = set(copy.deepcopy(gs_hp_list))
@@ -24,6 +30,15 @@
                 model_hp_list_copy.discard(model_hp)
         return similar_pairs, list(gs_hp_list_copy), list(model_hp_list_copy)
 
+    ##### MAIN
+
+    gs_names = {"do": "Disease Ontology", "ehrhart": "Ehrhart"}
+
+    ontology = plotter.hash_vars["ontology"]
+    omim_to_mondo_dict = plotter.hash_vars["omim_to_mondo_dict"]
+
+    omim_code_to_name_dict = dict(plotter.hash_vars["omim_list"])
+    pmid_to_title_dict = dict(plotter.hash_vars["pmid_titles"])
         
     all_both_data = ([["pmid", "score", "norm_rank", "abs_rank1", "abs_rank2", "omim_id", "dataset", "doc_type", "bench_type"]] +
                                         [ [row[0],row[1],row[2],row[3],row[4],row[5],row[9],row[10], "phenotype"] for row in plotter.hash_vars["all_phenotype_data"]] + 
@@ -51,28 +66,26 @@
 
                 if not plotter.hash_vars.get(f"cumm_dist"):
                     plotter.hash_vars[f"cumm_dist"] = top_k_header + cumm_dist_data
-                    plotter.hash_vars[f"topk_long"] = top_k_header + [[f"{perc}%", cumm_dist_data[row_idx][2], 
-                                                                            cumm_dist_data[row_idx][3], cumm_dist_data[row_idx][4], cumm_dist_data[row_idx][5]] 
-                                                                            for perc, row_idx in percentages_dict.items()]
+                    plotter.hash_vars[f"topk_long"] = top_k_header + [[                    f"{perc}%", cumm_dist_data[row_idx][2], cumm_dist_data[row_idx][3], cumm_dist_data[row_idx][4], cumm_dist_data[row_idx][5]] 
+                                                                        for perc, row_idx in percentages_dict.items()]
+                    plotter.hash_vars[f"topk_abs_long"] = top_k_header + [[cumm_dist_data[row_idx][0], cumm_dist_data[row_idx][2], cumm_dist_data[row_idx][3], cumm_dist_data[row_idx][4], cumm_dist_data[row_idx][5]] 
+                                                                        for row_idx in [0,1,4,9]]                                                                            
                 else:
                     plotter.hash_vars[f"cumm_dist"] += cumm_dist_data
-                    plotter.hash_vars[f"topk_long"] += [[f"{perc}%", cumm_dist_data[row_idx][2], 
-                                                         cumm_dist_data[row_idx][3], cumm_dist_data[row_idx][4], cumm_dist_data[row_idx][5]] 
+                    plotter.hash_vars[f"topk_long"] += [[                    f"{perc}%", cumm_dist_data[row_idx][2], cumm_dist_data[row_idx][3], cumm_dist_data[row_idx][4], cumm_dist_data[row_idx][5]] 
                                                          for perc, row_idx in percentages_dict.items()]
+                    plotter.hash_vars[f"topk_abs_long"] += [[cumm_dist_data[row_idx][0], cumm_dist_data[row_idx][2], cumm_dist_data[row_idx][3], cumm_dist_data[row_idx][4], cumm_dist_data[row_idx][5]] 
+                                                         for row_idx in [0,1,4,9]]
     
     #Changing topk table from long format to specific wide format for the barplot
     topk_order = {"1%": 1, "2%": 2, "5%": 3, "10%": 4}
-    df = pd.DataFrame(plotter.hash_vars[f"topk_long"][1:], columns = ["topk", "dist", "dataset", "doc_type", "bench_type"])
-    pivoted = pd.pivot_table(df, index='topk', columns=['dataset', 'doc_type', 'bench_type'], values='dist', margins=False)
-    pivoted = pivoted.rename(columns={"do":"do", "ehrhart":"ehrhart"})
-    pivoted = pivoted.sort_values(by='topk', key=lambda x: x.map(topk_order))
-    var_attr_names = ["dataset", "doc_type", "bench_type"]
-    var_attr = [[var_attr_names[idx]]+list(subl) for idx, subl in enumerate(zip(*[i for i in pivoted.columns])) ]
-    rows = [[i for i in row] for row in pivoted.itertuples()]
-    new_header = [["topK"] + [f"sample{i}" for i in range(1,len(rows[0]))]]
-    new_table = new_header + var_attr + rows
-    plotter.hash_vars[f"topk_wide"] = new_table
-            
+    topk_abs_order = {"top1": 1, "top2": 2, "top5": 3, "top10": 4}
+    
+    print(plotter.hash_vars["topk_long"][:3])
+    plotter.hash_vars[f"topk_wide"] = transform_from_long_to_wide(plotter.hash_vars["topk_long"][1:], topk_order)
+    print(plotter.hash_vars["topk_abs_long"][:3])
+    plotter.hash_vars[f"topk_abs_wide"] = transform_from_long_to_wide(plotter.hash_vars["topk_abs_long"][1:], topk_abs_order)        
+
     #Getting profiles phenotype stats table and data suitable for rontoplot
     ehrhart_profiles = {row[0]: row[1].split(",") for row in plotter.hash_vars["omim2_hpo_profiles.txt"]}
     do_profiles = {row[0]: row[1].split(",") for row in plotter.hash_vars["omim_hpo_profiles.txt"]}
