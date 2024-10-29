@@ -2,20 +2,27 @@ export RUN_NAME="OMIM_DO/splitpaper"
 export ZEROBENCH_GOLD_STANDARD="omim_pubmed_profiles.txt"
 export GOLD_STANDARDS="omim" #export GOLD_STANDARDS="omim omim2 mondo"
 export PREFILTER_PMIDS_FILE=$TMP_PATH/omim_unique_PMIDs
+
+export ADD_RANDOM_PAPERS="yes"
+export FILE_TO_GET_RANDOM="/mnt/home/users/bio_267_uma/jperezg/projects/LLMs/SemanticAnalysisPubmed/runs/OMIM_ALL/splitpaper/results/llm_pmID_profiles.txt"
+
 export METAREPORT_TAG="do.papers"
 
 export CORPUS_PATH="/mnt2/fscratch/users/bio_267_uma/jperezg/papers/downloaded"
 
-export PUBMED_CHUNKSIZE=5000
-export PUBMED_CHUNKSIZE_FILT=50
+export CHUNKSIZE=1
+export PUBMED_ITEMS_PER_FILE=40000
+export TEXT_BALANCE_SIZE=20000
+export AFTER_FILTER_SIZE=20000
+
 export SOFT_MIN_SIMILARITY=0.6
 export HARD_MIN_SIMILARITY=0.7
 export TOP_K=5
 
 export ENGINE_AUTOFLOW_TEMPLATE="workflow.af"
 
-export SPLITTED="-s"
-export PAPER="-p"
+export SPLIT_DOC="-s"
+export DOC_TYPE="PubmedPaper"
 export EQUIVALENCES="-e $INPUTS_PATH/PMC-PMID_equivalencies"
 
 export GPU_DEVICES="cuda:0-cuda:1-cuda:2-cuda:3"   #"cuda:0-cuda:1"
