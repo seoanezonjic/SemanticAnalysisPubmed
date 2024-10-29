@@ -22,16 +22,23 @@ ${plotter.prettify_div(disease_div)}
     <div class="col-sm-7 nopadding">
         <div style="width: 90%; background-color:#ecf0f1; margin: 0 auto;"> 
             <h1 style="text-align: center; background-color:#d6eaf8">Similarity matrix</h1>
-            ${plotter.similarity_matrix_plot( id= "similarity_matrix", header= True, row_names= True )}
+            ${plotter.prettify_div(
+                plotter.similarity_matrix_plot( id= "similarity_matrix", header= True, row_names= True )
+            )}
         </div>
 
         <div style="width: 90%; background-color:#ecf0f1; margin: 0 auto;"> 
             <h1 style="text-align: center; background-color:#d6eaf8">Negative terms matrix</h1>
-            ${plotter.similarity_matrix_plot( id= "negative_matrix", header= True, row_names= True )}
+            ${plotter.prettify_div(
+                plotter.similarity_matrix_plot( id= "negative_matrix", header= True, row_names= True )
+            )}
         </div>
     </div>
 
     <div class="col-sm-5 nopadding">
-        ${plotter.table(id="supp_info.txt", styled="dt", text=True, header=True, attrib = {'class' : 'table'}, custom_buttons = ['copyHtml5', 'excelHtml5', 'csvHtml5', 'pdfHtml5'])}
+        ${plotter.prettify_div(
+            plotter.table(id="supp_info.txt", styled="dt", text=True, header=True, attrib = {'class' : 'table'}, 
+                custom_buttons = ['copyHtml5', 'excelHtml5', 'csvHtml5', 'pdfHtml5'])
+        )}
     </div>
 </div>

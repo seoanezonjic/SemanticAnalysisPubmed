@@ -127,7 +127,7 @@ ${ plotter.create_collapsable_container('section1_to', section1, display='visibl
     published_years = [["year", "pmid"]] + [ [int(clean_num(row[2])), row[0]] for row in plotter.hash_vars["pubmed_metadata"][1:] 
                                                 if  row[2] != "0" and 
                                                     int(clean_num(row[2])) <= 2024 and 
-                                                    #int(clean_num(row[2])) > 1980 and 
+                                                    int(clean_num(row[2])) > 1930 and 
                                                     row[0] in papers_drawn_by_the_model]
     plotter.hash_vars["published_years"] = published_years
 
