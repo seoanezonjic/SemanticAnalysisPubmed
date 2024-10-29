@@ -33,12 +33,14 @@
     tail -n +2 $TMP_PATH/omim2.txt | awk 'BEGIN{IFS="\t";OFS="\t"}{print "OMIM:"$4,$3}' | grep -vE "OMIM:[^0-9]" | \
             aggregate_column_data -i - -x 1 -a 2 > $INPUTS_PATH/omim2_pubmed_profiles.txt		
     ln -s $INPUTS_PATH/omim_hpo_profiles.txt $INPUTS_PATH/omim2_hpo_profiles.txt
-    
-    #### Downloads PMC-PMID equivalences for some full papers that does not have PMID field
-    wget https://ftp.ncbi.nlm.nih.gov/pub/pmc/PMC-ids.csv.gz -O $TMP_PATH/PMC-ids.csv.gz
-    zcat $TMP_PATH/PMC-ids.csv.gz | cut -d "," -f 9,10 | tail -n +2 | tr "," "\t" | awk '{ if(NF == 2) print $0}' > $INPUTS_PATH/PMC-PMID_equivalencies
 
-    #Getting unique Disease IDs and PMIDs
-    cut -f 1 $INPUTS_PATH/omim2_pubmed_profiles.txt | sort -u > $TMP_PATH/omim2_unique_diseaseIDs_raw
-    cat $INPUTS_PATH/omim2_hpo_profiles.txt | grep -wf $TMP_PATH/omim2_unique_diseaseIDs_raw | cut -f 1 > $TMP_PATH/omim2_unique_diseaseIDs
-    cat $INPUTS_PATH/omim2_pubmed_profiles.txt | grep -wf $TMP_PATH/omim2_unique_diseaseIDs | cut -f 2 | tr "," "\n" | sort -u > $TMP_PATH/omim2_unique_PMIDs
+
+
+#### Downloads PMC-PMID equivalences for some full papers that does not have PMID field
+wget https://ftp.ncbi.nlm.nih.gov/pub/pmc/PMC-ids.csv.gz -O $TMP_PATH/PMC-ids.csv.gz
+zcat $TMP_PATH/PMC-ids.csv.gz | cut -d "," -f 9,10 | tail -n +2 | tr "," "\t" | awk '{ if(NF == 2) print $0}' > $INPUTS_PATH/PMC-PMID_equivalencies
+
+#Getting unique Disease IDs and PMIDs
+cut -f 1 $INPUTS_PATH/omim2_pubmed_profiles.txt | sort -u > $TMP_PATH/omim2_unique_diseaseIDs_raw
+cat $INPUTS_PATH/omim2_hpo_profiles.txt | grep -wf $TMP_PATH/omim2_unique_diseaseIDs_raw | cut -f 1 > $TMP_PATH/omim2_unique_diseaseIDs
+cat $INPUTS_PATH/omim2_pubmed_profiles.txt | grep -wf $TMP_PATH/omim2_unique_diseaseIDs | cut -f 2 | tr "," "\n" | sort -u > $TMP_PATH/omim2_unique_PMIDs

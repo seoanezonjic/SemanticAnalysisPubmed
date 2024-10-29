@@ -1,6 +1,8 @@
 #! /usr/bin/env bash
 source ~soft_bio_267/initializes/init_python
 
+############# 
+#export PYTORCH_CUDA_ALLOC_CONF='max_split_size_mb:128'
 
 ############# GENERAL PATHS
 export CURRENT_PATH=`pwd`
@@ -11,7 +13,8 @@ export CODE_PATH=$CURRENT_PATH/scripts
 export TEMPLATES_PATH=$CURRENT_PATH/templates
 export AUTOFLOW_TEMPLATES=$TEMPLATES_PATH/autoflow
 export REPORTS_TEMPLATES=$TEMPLATES_PATH/reports
-export METAREPORT_RESULTS_PATH=$CURRENT_PATH"/global_results/metareport"
+#export METAREPORT_RESULTS_PATH=$CURRENT_PATH"/global_results/no_random_negatives/metareport"
+export METAREPORT_RESULTS_PATH=$CURRENT_PATH"/global_results/with_random_negatives/metareport"
 
 export MODEL_PATH=$CURRENT_PATH/models
 export MODEL_NAME="all-mpnet-base-v2" #export MODEL_NAME="all-MiniLM-L6-v2"
@@ -82,8 +85,8 @@ elif [ "$2" == "zerobench_wf" ] ; then
 			\\$code_path=$CODE_PATH,
 			\\$model_name=$MODEL_NAME,
 			\\$current_model=$CURRENT_MODEL,
-			\\$splitted=$SPLITTED,
-			\\$paper=$PAPER,
+			\\$split_doc=$SPLIT_DOC,
+			\\$doc_type=$DOC_TYPE,
 			\\$equivalences=$EQUIVALENCES,
 			\\$queries=$QUERIES_PATH/omim_list,
 			\\$pubmed_path=$CORPUS_PATH,
@@ -95,12 +98,16 @@ elif [ "$2" == "zerobench_wf" ] ; then
 			\\$folders_to_parallelize=$FOLDERS_TO_PARALLELIZE,
 			\\$tsv_folder=$TSV_FOLDERS,
 			\\$n_parallel_folders=$N_PARALLEL_FOLDERS,
-			\\$pubmed_chunksize=$PUBMED_CHUNKSIZE,
+			\\$chunksize=$CHUNKSIZE,
+			\\$pubmed_items_per_file=$PUBMED_ITEMS_PER_FILE,
+			\\$text_balance_size=$TEXT_BALANCE_SIZE,
+			\\$after_filter_size=$AFTER_FILTER_SIZE,
 			\\$results_path=$RESULTS_PATH,
 			\\$report_templates_path=$REPORTS_TEMPLATES,
 			\\$omim_file=$INPUTS_PATH/$ZEROBENCH_GOLD_STANDARD,
 			\\$metareport_tag=$METAREPORT_TAG,
-			\\$metareport_results_path=$METAREPORT_RESULTS_PATH,			       
+			\\$metareport_results_path=$METAREPORT_RESULTS_PATH,
+			\\$add_random_papers=$ADD_RANDOM_PAPERS			       
 			" | tr -d [:space:]`
 		AutoFlow -e -w $AUTOFLOW_TEMPLATES/zero_bench.af -V $variables -o $ZEROBENCH_EXEC_PATH -m 20gb -t 3-00:00:00 -n cal -c 10 -L $3
 
@@ -114,8 +121,8 @@ elif [ "$2" == "engine_wf" ] ; then
 			\\$soft_min_similarity=$SOFT_MIN_SIMILARITY,
 			\\$hard_min_similarity=$HARD_MIN_SIMILARITY,
 			\\$top_k=$TOP_K,
-			\\$splitted=$SPLITTED,
-			\\$paper=$PAPER,
+			\\$splitted=$SPLIT_DOC,
+			\\$doc_type=$DOC_TYPE,
 			\\$equivalences=$EQUIVALENCES,
 			\\$queries=$QUERIES_PATH/hpo_list,
 			\\$pubmed_path=$CORPUS_PATH,
@@ -127,13 +134,18 @@ elif [ "$2" == "engine_wf" ] ; then
 			\\$folders_to_parallelize=$FOLDERS_TO_PARALLELIZE,
 			\\$tsv_folder=$TSV_FOLDERS,
 			\\$n_parallel_folders=$N_PARALLEL_FOLDERS,
-			\\$pubmed_chunksize=$PUBMED_CHUNKSIZE,
+			\\$chunksize=$CHUNKSIZE,
+			\\$pubmed_items_per_file=$PUBMED_ITEMS_PER_FILE,
+			\\$text_balance_size=$TEXT_BALANCE_SIZE,
+			\\$prefilter_pmids_file=$PREFILTER_PMIDS_FILE,
+			\\$after_filter_size=$AFTER_FILTER_SIZE,
 			\\$results_path=$RESULTS_PATH,
 			\\$tmp_path=$RUN_TMP_PATH,
 			\\$report_templates_path=$REPORTS_TEMPLATES,
-			\\$prefilter_pmids_file=$PREFILTER_PMIDS_FILE,
-			\\$postfilter_chunksize=$PUBMED_CHUNKSIZE_FILT,
-			\\$title_blacklisted_words=$RUN_TMP_PATH/blacklisted_words.txt		       
+			\\$add_random_papers=$ADD_RANDOM_PAPERS,
+			\\$file_to_get_random=$FILE_TO_GET_RANDOM,
+			\\$title_blacklisted_words=$RUN_TMP_PATH/blacklisted_words.txt,
+			\\$pytorch_cuda_alloc_conf=$PYTORCH_CUDA_ALLOC_CONF		       
 			" | tr -d [:space:]`
 		AutoFlow -e -w $ENGINE_AUTOFLOW_TEMPLATE_PATH -V $variables -o $ENGINE_EXEC_PATH -m 20gb -t 3-00:00:00 -n cal -c 10 -L $3
 
@@ -219,20 +231,24 @@ elif [ "$2" == "reports" ]; then
 			cohort_analyzer -i $RUN_INPUTS_PATH/"$GOLD"_HPOs_cleaned -o $RESULTS_PATH/reports/cohort_"$GOLD"/cohort_analyzer -d 0 -p 1 -S "," -m lin -a -H
 		done
 		cohort_analyzer -i $RESULTS_PATH/llm_pmID_profiles.txt -o $RESULTS_PATH/reports/cohort_stEngine/cohort_analyzer -d 0 -p 1 -S "," -m lin -a -H
-		
+
+elif [ "$2" == "prepare_metareport_data" ]; then 
+		source $PYENV/bin/activate #TODO: Remove later
+		export PATH=$PYENV/bin:$PATH
+
+		cp $CURRENT_PATH"/runs/OMIM_DO/splitpaper/results/llm_pmID_profiles.txt" $METAREPORT_RESULTS_PATH/do_papers_llm_pmID_profiles.txt
+		cp $CURRENT_PATH"/runs/OMIM_DO/splitabstract/results/llm_pmID_profiles.txt" $METAREPORT_RESULTS_PATH/do_abstracts_llm_pmID_profiles.txt
+		cp $CURRENT_PATH"/runs/OMIM_ehrhart/splitpaper/results/llm_pmID_profiles.txt" $METAREPORT_RESULTS_PATH/ehrhart_papers_llm_pmID_profiles.txt
+		cp $CURRENT_PATH"/runs/OMIM_ehrhart/splitabstract/results/llm_pmID_profiles.txt" $METAREPORT_RESULTS_PATH/ehrhart_abstracts_llm_pmID_profiles.txt
+		cat $METAREPORT_RESULTS_PATH/../disease* > $METAREPORT_RESULTS_PATH/all_disease_data
+		cat $METAREPORT_RESULTS_PATH/../phenotype* > $METAREPORT_RESULTS_PATH/all_phenotype_data
+		if [ ! -s $METAREPORT_RESULTS_PATH/pmid_titles ]; then cut -f 1 $METAREPORT_RESULTS_PATH/all_phenotype_data | sort -u | get_pmid_titles.py -i - -o $METAREPORT_RESULTS_PATH/pmid_titles ;fi
+
 elif [ "$2" == "metareport" ]; then
 		source $PYENV/bin/activate #TODO: Remove later
 		export PATH=$PYENV/bin:$PATH
 		HPO_PATH=`semtools -d list | grep HPO`
 		MONDO_PATH=`semtools -d list | grep MONDO`
-
-#		cp $CURRENT_PATH"/runs/OMIM_DO/splitpaper/results/llm_pmID_profiles.txt" $METAREPORT_RESULTS_PATH/do_papers_llm_pmID_profiles.txt
-#		cp $CURRENT_PATH"/runs/OMIM_DO/splitabstract/results/llm_pmID_profiles.txt" $METAREPORT_RESULTS_PATH/do_abstracts_llm_pmID_profiles.txt
-#		cp $CURRENT_PATH"/runs/OMIM_ehrhart/splitpaper/results/llm_pmID_profiles.txt" $METAREPORT_RESULTS_PATH/ehrhart_papers_llm_pmID_profiles.txt
-#		cp $CURRENT_PATH"/runs/OMIM_ehrhart/splitabstract/results/llm_pmID_profiles.txt" $METAREPORT_RESULTS_PATH/ehrhart_abstracts_llm_pmID_profiles.txt
-#		cat $METAREPORT_RESULTS_PATH/../disease* > $METAREPORT_RESULTS_PATH/all_disease_data
-#		cat $METAREPORT_RESULTS_PATH/../phenotype* > $METAREPORT_RESULTS_PATH/all_phenotype_data
-		if [ ! -s $METAREPORT_RESULTS_PATH/pmid_titles ]; then cut -f 1 $METAREPORT_RESULTS_PATH/all_phenotype_data | sort -u | get_pmid_titles.py -i - -o $METAREPORT_RESULTS_PATH/pmid_titles ;fi
 
 		data_paths=`echo -e "
 			$METAREPORT_RESULTS_PATH/all_disease_data,
