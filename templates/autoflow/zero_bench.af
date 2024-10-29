@@ -12,8 +12,8 @@
 	if [[ ! -s pre_filtered_queries ]]; then exit 1; fi
 }
 
-%get_and_filter_abstracts){
-	resources: -n cal -c 150 -t '1-12:00:00' -m '650gb'
+get_and_filter_abstracts){
+	resources: -n cal -c 250 -t '1-12:00:00' -m '680gb'
 	. ~soft_bio_267/initializes/init_python
 
 	export PATH=$code_path:$PATH #TODO: Remove later
@@ -23,9 +23,19 @@
 	n_cpus=$(([cpu] - 3))
 	mkdir indexes
 	?
-	get_pubmed_index -i "$pubmed_path/*" -o indexes -t "pubmed_" -k $pubmed_chunksize -c $n_cpus -d $splitted $paper $equivalences
+	get_corpus_index -i "$pubmed_path/*" -o indexes -t "pubmed_" -c $n_cpus -d $split_doc -p $doc_type $equivalences \
+					 -z $chunksize -k $pubmed_items_per_file -b $text_balance_size --split_output_files
     zcat indexes/*.gz | grep -wf OMIM_PMIDS_TO_FILTER > filtered_corpus_raw
-	intersect_columns -a filtered_corpus_raw -b OMIM_PMIDS_TO_FILTER -A 1 -B 1 --k c --full | cut -f 1-7 | gzip > filtered_corpus.gz
+	intersect_columns -a filtered_corpus_raw -b OMIM_PMIDS_TO_FILTER -A 1 -B 1 --k c --full | cut -f 1-7 > filtered_corpus
+	
+	if [[ $add_random_papers == "yes" ]]; then
+		total_files_number=`zcat indexes/*.gz | wc -l`
+		gold_files_number=`cat filtered_corpus | wc -l`
+		random_files_indexes=`shuf -i 1-$total_files_number -n $gold_files_number | tr "\n" " "`
+		zcat indexes/*.gz | awk -v rows="$random_files_indexes" 'BEGIN {split(rows, a); for (i in a) {map[a[i]] = 1}} FNR in map {print $0}' > random_chosen_files
+		cat random_chosen_files >> filtered_corpus
+	fi
+	
 	if [[ `zcat filtered_corpus.gz | wc -l` == 0 ]]; then exit 1; fi
 	
 	zcat filtered_corpus.gz | cut -f 1 > common_pmids
@@ -36,8 +46,9 @@
 }
 
 %query_abstracts){
-    resources: -n dgx -c 120 -t '6-00:00:00' -m '860gb' -A exclude=exa01;$n_gpus
+    resources: -n dgx -c 120 -t '6-00:00:00' -m '600gb' -A $n_gpus
 	. ~soft_bio_267/initializes/init_python
+	ln -s get_and_filter_abstracts)/OMIM_PMIDS_TO_FILTER OMIM_PMIDS_TO_FILTER
 	export PATH=$code_path:$PATH #TODO: Remove later
 	source $pyenv/bin/activate #TODO: Remove later
 	export MKL_NUM_THREADS=$(([cpu] - 3)) #Pytorch option for CPU
@@ -54,7 +65,7 @@
              -c get_and_filter_abstracts)/filtered_corpus.gz \
              -q get_and_filter_abstracts)/filtered_queries \
              -k 0 -t "-1" -o semantic_scores \
-             -g $gpu_csv $splitted -v $use_gpu_for_sim_calc \
+             -g $gpu_csv $split_doc -v $use_gpu_for_sim_calc \
 			 --order "query-corpus"
 
 	if [[ ! -s semantic_scores/filtered_queries ]]; then exit 1; fi #exit if no results
@@ -63,6 +74,9 @@
 	#TODO: hacer script para agregar el resultado del stengine y escribir a zip. Hacer que el stEngine pueda escribir comprimido
 	sed -E 's/_[0-9]+_[0-9]+//g' semantic_scores/filtered_queries | aggregate_column_data -i - -x 1,2 -a 3 -A max > rankings
 	#rm -rf semantic_scores/*
+
+	mv rankings rankings_raw
+	grep -wf OMIM_PMIDS_TO_FILTER rankings_raw > rankings
 }
 
 %rank_diseases[0-209]){
@@ -91,7 +105,8 @@
 	if [[ ! -s all_rankings_rankerlike ]]; then exit 1; fi #exit if no results
 }
 
-aggregate_results){
+%aggregate_results){
+	resources: -c 10 -m '300gb'
 	. ~soft_bio_267/initializes/init_python
 	. ~soft_bio_267/initializes/init_R
 	export PATH=/mnt/home/soft/soft_bio_267/programs/x86_64/scripts:$PATH
@@ -111,7 +126,7 @@ aggregate_results){
 	cp disease_rankings.html $results_path/reports/disease_rankings.html
 }
 
-prepare_metareport_data){
+%prepare_metareport_data){
 	tag_formatted=`echo $metareport_tag | tr "." "_"`
 	?
 	cat aggregate_results)/filtered_rankings | awk -v tag="$metareport_tag" 'BEGIN{OFS="\t"; split(tag,tag_arr,".")}{print $0,tag_arr[1],tag_arr[2]}' > disease_rankings_$tag_formatted

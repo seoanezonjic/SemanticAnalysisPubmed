@@ -1,6 +1,5 @@
 get_abstracts){
-	resources: -n cal -c 150 -t '1-12:00:00' -m '650gb'
-	#resources: -n cal -c 10 -t '7-00:00:00' -m '60gb'	
+	resources: -n cal -c 250 -t '1-12:00:00' -m '680gb'	
 	. ~soft_bio_267/initializes/init_python
 
 	export PATH=$code_path:$PATH #TODO: Remove later
@@ -10,7 +9,8 @@ get_abstracts){
 	n_cpus=$(([cpu] - 3))
 	mkdir indexes
 	?
-	get_pubmed_index -i "$pubmed_path/*" -o indexes -t "pubmed_" -k $pubmed_chunksize -c $n_cpus -d $splitted $paper $equivalences
+	get_corpus_index -i "$pubmed_path/*" -o indexes -t "pubmed_" -c $n_cpus -d $split_doc -p $doc_type $equivalences \
+					 -z $chunksize -k $pubmed_items_per_file -b $text_balance_size --split_output_files
 
 	#BEGIN:EXPERIMENTAL: TRYING TO PARALLELIZE 4 PUMBED FILLED BALANCED FOLDERS TO DRISTIBUTE THE EMBEDDING PROCESS IN 4 EXA NODES
 	ls indexes > indexes_list
@@ -32,11 +32,12 @@ get_abstracts){
 }
 
 
-query_abstracts_[$folders_to_parallelize]){
-	resources: -n dgx -c 30 -t '6-00:00:00' -m '120gb' -A exclude=exa01;$n_gpus	
-    #resources: -n dgx -c 120 -t '6-00:00:00' -m '360gb' -A exclude=exa01;$n_gpus
+%query_abstracts_[$folders_to_parallelize]){
+	resources: -n dgx -m '25gb' -c 16 -t '6-00:00:00' -A $n_gpus	
+    #resources: -n dgx -c 120 -t '6-00:00:00' -m '120gb' -A exclude=exa01;$n_gpus;mem-per-gpu=30G;cpus-per-gpu=10
 	. ~soft_bio_267/initializes/init_python
 
+	#export PYTORCH_CUDA_ALLOC_CONF=$pytorch_cuda_alloc_conf
 	export PATH=$code_path:$PATH #TODO: Remove later
 	source $pyenv/bin/activate #TODO: Remove later
 
@@ -51,14 +52,14 @@ query_abstracts_[$folders_to_parallelize]){
 	stEngine -m $model_name -p $current_model \
              -c get_abstracts)/(*)/"*.gz" -q $queries \
              -k $top_k -t $soft_min_similarity -o semantic_scores \
-             -g $gpu_csv $splitted -v $use_gpu_for_sim_calc
+             -g $gpu_csv $split_doc -v $use_gpu_for_sim_calc --chunk_size $pubmed_chunksize
 
 	if [[ ! -s semantic_scores/$query_basename ]]; then exit 1; fi #exit if no results
 	awk '{print $2 "\t" $1 "\t" $3 }' semantic_scores/$query_basename > soft_filtered_scores_raw
 	rm semantic_scores/$query_basename
 }
 
-aggregate_results){
+%aggregate_results){
 	resources: -n cal -c 4 -m '500gb' -t '1-12:00:00'
 	. ~soft_bio_267/initializes/init_python
 	export PATH=$code_path:$PATH #TODO: Remove later
@@ -66,19 +67,19 @@ aggregate_results){
 	query_basename=`basename $queries`
 	?
 	cat !query_abstracts_!/soft_filtered_scores_raw | awk '{if($3 >= '$hard_min_similarity') print $0}' > hard_filtered_scores_raw
-	collapse_same_HPs_inside_of_splitted_abstract.py -i hard_filtered_scores_raw -o hard_filtered_scores
-	aggregate_column_data -i hard_filtered_scores -x 2 -a 1,3,4 > llm_term_profiles.txt
-	aggregate_column_data -i hard_filtered_scores -x 1 -a 2,3,4 > llm_pmID_profiles_with_cosine_sim.txt
-
-	cut -f 1,2 hard_filtered_scores | semtools -i - -O HPO -c -T "HP:0000118" --2cols --out2cols -o llm_pmID_profiles_cleaned_2cols.txt
-	aggregate_column_data -i llm_pmID_profiles_cleaned_2cols.txt -x 1 -a 2 > llm_pmID_profiles_cleaned.txt
-	if [ ! -s llm_pmID_profiles_cleaned.txt ]; then exit 1; fi #exit if no results
-
-	if [ -s pubmed_metadata_full ]; then rm pubmed_metadata_full; rm pubmed_ids_and_titles_raw;fi
-	for filename in get_abstracts)/indexes/* ; do
-		zcat $filename | cut -f 1,3,4,5,6,7 >> pubmed_metadata_full
-		zcat $filename | cut -f 1,8,9,10 | awk 'BEGIN{FS="\t"}{if(NF == 4 && $1!="" && $2!="" && $3!="" && $4!="") print $0}' >> pubmed_ids_and_titles_raw
-	done
+#	collapse_same_HPs_inside_of_splitted_abstract.py -i hard_filtered_scores_raw -o hard_filtered_scores
+#	aggregate_column_data -i hard_filtered_scores -x 2 -a 1,3,4 > llm_term_profiles.txt
+#	aggregate_column_data -i hard_filtered_scores -x 1 -a 2,3,4 > llm_pmID_profiles_with_cosine_sim.txt
+#
+#	cut -f 1,2 hard_filtered_scores | semtools -i - -O HPO -c -T "HP:0000118" --2cols --out2cols -o llm_pmID_profiles_cleaned_2cols.txt
+#	aggregate_column_data -i llm_pmID_profiles_cleaned_2cols.txt -x 1 -a 2 > llm_pmID_profiles_cleaned.txt
+#	if [ ! -s llm_pmID_profiles_cleaned.txt ]; then exit 1; fi #exit if no results
+#
+#	if [ -s pubmed_metadata_full ]; then rm pubmed_metadata_full; rm pubmed_ids_and_titles_raw;fi
+#	for filename in get_abstracts)/indexes/* ; do
+#		zcat $filename | cut -f 1,3,4,5,6,7 >> pubmed_metadata_full
+#		zcat $filename | cut -f 1,8,9,10 | awk 'BEGIN{FS="\t"}{if(NF == 4 && $1!="" && $2!="" && $3!="" && $4!="") print $0}' >> pubmed_ids_and_titles_raw
+#	done
 	if [[ -s $title_blacklisted_words ]]; then
 		#Line below outputs to pubmed_ids_and_titles
 		sed 's/[^A-Za-z0-9]$//g' pubmed_ids_and_titles_raw | awk 'BEGIN{FS=OFS="\t"}{gsub(/^[ \t]+|[ \t]+$/, "", $3);gsub(/^[ \t]+|[ \t]+$/, "", $4);if(NF == 4 && $1!="" && $2!="" && $3!="" && $4!="") print $1,$2,$3,$4}' > pubmed_ids_and_titles
@@ -88,7 +89,7 @@ aggregate_results){
 		cut -f 1 blacklisted_pubmed_ids_and_titles > blacklisted_pmids
 		#Filtering now blacklisted words in article-category
 		filter_by_list -f pubmed_ids_and_titles -c 4 -t $title_blacklisted_words -o ./ --prefix blacklisted_ --not_exact_match
-		cut -f 1 blacklisted_pubmed_ids_and_titles > blacklisted_pmids
+		cut -f 1 blacklisted_pubmed_ids_and_titles >> blacklisted_pmids
 		sort -u blacklisted_pmids > blacklisted_pmids_unique
 
 		grep -vwf blacklisted_pmids_unique llm_pmID_profiles_cleaned.txt > llm_pmID_profiles_cleaned_filtered.txt

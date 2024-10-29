@@ -1,4 +1,4 @@
-embbed_queries){
+%embbed_queries){
 	resources: -n sd -c 30 -t '0-05:00:00'
 	. ~soft_bio_267/initializes/init_python
 
@@ -13,7 +13,7 @@ embbed_queries){
 }
 
 get_abstracts){
-	resources: -n cal -c 150 -t '1-10:00:00' -m '650gb'
+	resources: -n cal -c 250 -t '1-10:00:00' -m '680gb'
 	#resources: -n cal -c 10 -t '7-00:00:00' -m '60gb'	
 	. ~soft_bio_267/initializes/init_python
 
@@ -24,7 +24,8 @@ get_abstracts){
 	n_cpus=$(([cpu] - 3))
 	mkdir indexes
 	?
-	get_pubmed_index -i "$pubmed_path/*" -o indexes -t "pubmed_" -k $pubmed_chunksize -c $n_cpus -d $splitted $paper $equivalences
+	get_corpus_index -i "$pubmed_path/*" -o indexes -t "pubmed_" -c $n_cpus -d $split_doc -p $doc_type $equivalences \
+					 -z $chunksize -k $pubmed_items_per_file -b $text_balance_size --split_output_files
 
 	#NEW STEP: CHECKING IF A PREFILTER PMIDs FILE IS GIVEN AND THEN SUBSET CORPUS TO ONLY CONTAIN THOSE PAPERS/ABSTRACTS
 	# AND SPLITTING IN DIFFERENT FILES TO END WITH FILE SIZE EQUAL TO PUBMED_CHUNKSIZE
@@ -33,12 +34,21 @@ get_abstracts){
 		if [[ -s "$pmids_prefilter_filepath" ]]; then 
 			zgrep --no-filename -wf $prefilter_pmids_file indexes/*.gz > filtered_corpus_raw
 			intersect_columns -a filtered_corpus_raw -b $prefilter_pmids_file -A 1 -B 1 --k c --full | cut -f 1-7 > filtered_corpus
-			if [ ! -s filtered_corpus ]; then exit 1; fi #exit if no results 
+			if [ ! -s filtered_corpus ]; then exit 1; fi #exit if no results
+
+			if [[ $add_random_papers == "yes" ]]; then
+				total_files_number=`zcat indexes/*.gz | wc -l`
+				gold_files_number=`cat filtered_corpus | wc -l`
+				random_files_indexes=`shuf -i 1-$total_files_number -n $gold_files_number | tr "\n" " "`
+				zcat indexes/*.gz | awk -v rows="$random_files_indexes" 'BEGIN {split(rows, a); for (i in a) {map[a[i]] = 1}} FNR in map {print $0}' > random_chosen_files
+				cat random_chosen_files >> filtered_corpus
+			fi
+
 			rm indexes/*
 			n_docs=`cat filtered_corpus | wc -l`
-			for start_idx in $(seq 0 `echo "$n_docs/$postfilter_chunksize" | bc`); do
-				start_line=`echo "$start_idx*$postfilter_chunksize+1" | bc`
-				tail -n +$start_line filtered_corpus | head -n $postfilter_chunksize | gzip > indexes/pubmed_$start_idx.gz
+			for start_idx in $(seq 0 `echo "$n_docs/$after_filter_size" | bc`); do
+				start_line=`echo "$start_idx*$after_filter_size+1" | bc`
+				tail -n +$start_line filtered_corpus | head -n $after_filter_size | gzip > indexes/pubmed_$start_idx.gz
 			done
 			if [ `ls indexes | wc -l` -eq 0 ]; then exit 1; fi #exit if no results
 			#rm filtered_corpus
@@ -65,13 +75,14 @@ get_abstracts){
 	cp abstracts_debug_stats.txt $tmp_path/abstracts_debug_stats.txt
 }
 
-embbed_abstracts_[$folders_to_parallelize]){
-	resources: -n dgx -c 10 -t '1-12:00:00' -m '360gb' -A exclude=exa01;$n_gpus
+%embbed_abstracts_[$folders_to_parallelize]){
+	resources: -n dgx -c 10 -t '1-12:00:00' -m '360gb' -A $n_gpus
 	#resources: -n dgx -c 10 -t '0-12:00:00' -m '120gb' -A exclude=exa04;gres=gpu:8
 	#resources: -n sd -c 46 -t '4-00:00:00' -m '80gb'
 	# Rebuild script to load once the model, load each corpus and apply all cpu (use autoflow cpu option in THREADS variables) in one embedding, write it to disk and take the next one
 	#. ~soft_bio_267/initializes/init_python
-	source ~soft_bio_267/initializes/init_pytorch	
+	source ~soft_bio_267/initializes/init_pytorch
+	export PYTORCH_CUDA_ALLOC_CONF=$pytorch_cuda_alloc_conf	
 
 	echo [cpu]
 	export PATH=$code_path:$PATH #TODO: Remove later
@@ -84,11 +95,11 @@ embbed_abstracts_[$folders_to_parallelize]){
 	gpu_csv=`echo $gpu_devices | tr '-' ','`
 	echo "using gpu devices: $gpu_csv"
 	?
-	stEngine -m $model_name -p $current_model -c get_abstracts)/(*)/"*.gz" -C embeddings -g $gpu_csv -v $splitted
+	stEngine -m $model_name -p $current_model -c get_abstracts)/(*)/"*.gz" -C embeddings -g $gpu_csv -v $split_doc --chunk_size $pubmed_chunksize
 	if [ `ls embeddings | wc -l` -eq 0 ]; then exit 1; fi
 }
 
-query_abstracts_[$folders_to_parallelize]){
+%query_abstracts_[$folders_to_parallelize]){
 	#resources: -n cal -c 13 -m 150G
 	resources: -n cal -c 150 -m 650G
 	. ~soft_bio_267/initializes/init_python
@@ -107,7 +118,7 @@ query_abstracts_[$folders_to_parallelize]){
 	rm semantic_scores/$query_basename
 }
 
-aggregate_results){
+%aggregate_results){
 	resources: -n cal -c 4 -m '500gb' -t '0-12:00:00'
 	. ~soft_bio_267/initializes/init_python
 	export PATH=$code_path:$PATH #TODO: Remove later
@@ -143,7 +154,15 @@ aggregate_results){
 		grep -vwf blacklisted_pmids_unique llm_pmID_profiles_cleaned.txt > llm_pmID_profiles_cleaned_filtered.txt
 		rm llm_pmID_profiles_cleaned.txt; mv llm_pmID_profiles_cleaned_filtered.txt llm_pmID_profiles_cleaned.txt
 	fi
-	
+
+	if [[ $add_random_papers == "yes" ]]; then
+		total_profiles_number=`cat $file_to_get_random | wc -l`
+		gold_profiles_number=`cat llm_pmID_profiles_cleaned.txt | wc -l`
+		random_profiles_indexes=`shuf -i 1-$total_profiles_number -n $gold_profiles_number | tr "\n" " "`
+		cat $file_to_get_random | awk -v rows="$random_profiles_indexes" 'BEGIN {split(rows, a); for (i in a) {map[a[i]] = 1}} FNR in map {print $0}' > random_chosen_profiles.txt
+		cat random_chosen_profiles.txt >> llm_pmID_profiles_cleaned.txt
+	fi
+
 	cp hard_filtered_scores $results_path/llm_filtered_scores
 	cp llm_pmID_profiles_with_cosine_sim.txt $results_path/llm_pmID_profiles_with_cosine_sim.txt
 	cp llm_pmID_profiles_cleaned.txt $results_path/llm_pmID_profiles.txt
