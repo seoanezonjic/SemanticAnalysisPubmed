@@ -1,0 +1,14 @@
+<%
+    def process_pie_data(data):
+        data[0][0] = "Type"
+        #data.pop(2)
+
+
+    section1 = plotter.pie(id="total_stats_nonzero", header=True, row_names= True, transpose = True, func=process_pie_data,  
+                                title="Pubmed articles stats") + "\n"
+    section1 += plotter.density(id="file_proportion_stats", header=True, row_names= True, fields=[0,2], 
+                                config = {"yAxisTitle": "File number", "xAxisTitle": "Missing abstracts proportion"},
+                                title="Distribution of missing abstracts inside original files downloaded from PubMed") + "\n"
+%>
+
+${section1}

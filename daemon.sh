@@ -22,7 +22,7 @@ export CURRENT_MODEL=$MODEL_PATH/$MODEL_NAME
 
 export OMIM_QUERY_INPUT_DATA="/mnt/home/users/bio_267_uma/federogc/projects/GraphPrioritizer/control_genes/zampieri/data/omim_data/mimTitles.txt" #For OMIM list as query
 
-export PYENV=$HOME/py_venvs/llm_env #TODO: Remove later
+export PYENV=$CURRENT_PATH/llm_env #TODO: Remove later
 export PATH=$CODE_PATH:$PATH
 
 export PUBMED_CHUNKSIZE_FILT=100
@@ -51,7 +51,7 @@ echo -e "proof_wf\t$PROOF_EXEC_PATH" >> $CURRENT_PATH/workflow_paths
 
 mkdir -p $RESULTS_PATH; mkdir -p $RESULTS_PATH/reports; mkdir -p $RESULTS_PATH/reports/cohort_stEngine; mkdir -p $INPUTS_PATH ; mkdir -p $TMP_PATH
 mkdir -p $PUBMED_FILES_STATS_PATH; mkdir -p $AUTOFLOW_TEMPLATES; mkdir -p $REPORTS_TEMPLATES; mkdir -p $QUERIES_PATH ; mkdir -p $TEMPLATES_PATH; 
-mkdir -p $RUN_FOLDER; mkdir -p $RUN_TMP_PATH; mkdir -p $RUN_INPUTS_PATH; mkdir -p $METAREPORT_RESULTS_PATH
+mkdir -p $RUN_FOLDER; mkdir -p $RUN_TMP_PATH; mkdir -p $RUN_INPUTS_PATH; mkdir -p $METAREPORT_RESULTS_PATH; mkdir -p $PYENV
 #OTHER VARIABLES
 export database_ids="OMIM ORPHA"
 
@@ -202,7 +202,10 @@ elif [ "$2" == "prepare_results" ]; then
 
 elif [ "$2" == "reports" ]; then
 		#Preparing some data for benchmarking part
+		#python -m venv `basename $PYENV` --system-site-packages
 		source $PYENV/bin/activate #TODO: Remove later
+		#pip install -e $HOME/dev_py/py_report_html
+		#pip install matplotlib_venn
 
 		for GOLD in $GOLD_STANDARDS; do
 			mkdir -p $RESULTS_PATH/reports/cohort_"$GOLD"
@@ -226,11 +229,12 @@ elif [ "$2" == "reports" ]; then
 
 			report_html -d $data_paths \
 						-t $REPORTS_TEMPLATES/stEngine_and_similitudes.txt \
-						-o $RESULTS_PATH/reports/stEngine_and_similitudes_$GOLD
+						-o $RESULTS_PATH/reports/stEngine_and_similitudes_$GOLD \
+						-s $REPORTS_TEMPLATES/subtemplates
 
-			cohort_analyzer -i $RUN_INPUTS_PATH/"$GOLD"_HPOs_cleaned -o $RESULTS_PATH/reports/cohort_"$GOLD"/cohort_analyzer -d 0 -p 1 -S "," -m lin -a -H
+			#cohort_analyzer -i $RUN_INPUTS_PATH/"$GOLD"_HPOs_cleaned -o $RESULTS_PATH/reports/cohort_"$GOLD"/cohort_analyzer -d 0 -p 1 -S "," -m lin -a -H
 		done
-		cohort_analyzer -i $RESULTS_PATH/llm_pmID_profiles.txt -o $RESULTS_PATH/reports/cohort_stEngine/cohort_analyzer -d 0 -p 1 -S "," -m lin -a -H
+		#cohort_analyzer -i $RESULTS_PATH/llm_pmID_profiles.txt -o $RESULTS_PATH/reports/cohort_stEngine/cohort_analyzer -d 0 -p 1 -S "," -m lin -a -H
 
 elif [ "$2" == "prepare_metareport_data" ]; then 
 		source $PYENV/bin/activate #TODO: Remove later

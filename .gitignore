@@ -8,3 +8,4 @@ previous_results/
 debug/
 workflow_paths
 runs/
+llm_env/

@@ -1,0 +1,65 @@
+<% 
+    def plot_hexplot_without_marginals_1(data, plotter_list):
+        g = plotter_list["sns"].jointplot(data=data, x="term_depth", y="counts", kind="hex")
+        g.ax_marg_x.remove()
+        g.ax_marg_y.remove()
+
+    def plot_hexplot_without_marginals_2(data, plotter_list):
+        g = plotter_list["sns"].jointplot(data=data, x="profile_length", y="profile_terms_mean_depth", kind="hex")
+        g.ax_marg_x.remove()
+        g.ax_marg_y.remove()
+
+    def clean_num(num):
+        return num.replace(".", "").replace("c", "")
+
+    papers_drawn_by_the_model = set(dict(plotter.hash_vars['llm_pmID_profiles.txt']).keys())
+    published_years = [["year", "pmid"]] + [ [int(clean_num(row[2])), row[0]] for row in plotter.hash_vars["pubmed_metadata"][1:] 
+                                                if  row[2] != "0" and 
+                                                    int(clean_num(row[2])) <= 2024 and 
+                                                    int(clean_num(row[2])) > 1930 and 
+                                                    row[0] in papers_drawn_by_the_model]
+    plotter.hash_vars["published_years"] = published_years
+
+    def plot_with_integer_ticks(data, plotter_list):
+        import math
+        plotter_list["sns"].boxplot(data=data, y="year")
+        ticks = range(math.floor(min(data["year"])), math.ceil(max(data["year"]))+1, int((max(data["year"])-min(data["year"]))/10) )
+        plotter_list["plt"].yticks(ticks)
+
+
+
+
+    section2 = '<div style="overflow: hidden; display: flex; flex-direction: row; justify-content: center;">' + "\n"
+    section2 +=  plotter.static_plot_main(id="published_years", width = 400, height = 800, header=True, row_names= False, fields=[0], rezisable=False,
+                                        title="Publication year", x_label = "Year", y_label = "",
+                                        plotting_function=  plot_with_integer_ticks,
+                                        img_attribs=f"width=31% height=45%" ) + "\n"
+    section2 +=  plotter.static_plot_main(id="similitudes", width = 400, height = 800, header=True, row_names= False, fields=[0], rezisable=False,
+                                        title="Distribution of semantic scores", x_label = "Semantic Score", y_label = "Number of Abstract-HP term relations",
+                                        plotting_function=  lambda data, plotter_list: plotter_list["sns"].boxplot(data=data, y="SIM_SCORE", showfliers=False),
+                                        img_attribs=f"width=31% height=45%" ) + "\n"
+    section2 += plotter.static_plot_main(id="PMIDs_prevalence", width = 400, height = 800, header=True, row_names= False, fields=[0], rezisable=False,
+                                        title="Distribution of abstract HP annotations", y_label = "Counts", x_label = "HP number per abstract", 
+                                        plotting_function=  lambda data, plotter_list: plotter_list["sns"].boxplot(data=data, y="PREVALENCE", showfliers=False),
+                                        img_attribs=f"width=31% height=45%" ) + "\n"
+    section2 += plotter.static_plot_main(id="HPOs_prevalence", width = 400, height = 800, header=True, row_names= False, fields=[0], rezisable=False,
+                                        title="Distribution of HP annotations", y_label = "Counts", x_label = "Abstracts per HP", 
+                                        plotting_function=  lambda data, plotter_list: plotter_list["sns"].boxplot(data=data, y="PREVALENCE", showfliers=False),
+                                        img_attribs=f"width=31% height=45%"  ) + "\n"
+    section2 += "</div>" + "\n"
+    
+    section2 += plotter.create_title("Supplementary Data", id='section2_supp_from', hlevel=2, indexable=False, clickable=True, t_id='section2_supp_to', clickable_text = '(Click me)')
+    section2_sup = plotter.static_plot_main(id=f"hp_counts_vs_hp_depth", header=True, row_names=True, 
+                                        plotting_function=  plot_hexplot_without_marginals_1,
+                                        title=f"Number of times that a HP term was found in a paper \nvs the HP term depth in the ontology",        
+                                        x_label=f"Term's depth in the HPO", y_label=f"Number of times found in papers", rezisable=False,
+                                        width = 800, height = 800, img_properties=r"width=45% height=60%") + "\n"
+    section2_sup += plotter.static_plot_main(id=f"pmid_nTerms_and_mean_profile_depth", header=True, row_names=True,
+                                        plotting_function=  plot_hexplot_without_marginals_2,     
+                                        title=f"Abstract-HPO profile size vs terms mean depth", rezisable=False,
+                                        x_label=f"Size of the Abstract HPO profile", y_label=f"Mean depth of the HP terms inside the profile",
+                                        width = 800, height = 800, img_properties=r"width=45% height=60%") + "\n"                                    
+    section2 += plotter.create_collapsable_container('section2_supp_to', section2_sup, display='hidden')
+%>
+
+${section2}
