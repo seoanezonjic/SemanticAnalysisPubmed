@@ -4,6 +4,8 @@
     import copy
     import pprint
 
+    global color_legend
+
     ##### FUNCTIONS 
     def transform_from_long_to_wide(table, topk_order_dict):
         df = pd.DataFrame(table, columns = ["topk", "dist", "dataset", "doc_type", "bench_type"])
@@ -81,14 +83,17 @@
     topk_order = {"1%": 1, "2%": 2, "5%": 3, "10%": 4}
     topk_abs_order = {"top1": 1, "top2": 2, "top5": 3, "top10": 4}
     
-    print(plotter.hash_vars["topk_long"][:3])
+    #print(plotter.hash_vars["topk_long"][:3])
     plotter.hash_vars[f"topk_wide"] = transform_from_long_to_wide(plotter.hash_vars["topk_long"][1:], topk_order)
-    print(plotter.hash_vars["topk_abs_long"][:3])
+    #print(plotter.hash_vars["topk_abs_long"][:3])
     plotter.hash_vars[f"topk_abs_wide"] = transform_from_long_to_wide(plotter.hash_vars["topk_abs_long"][1:], topk_abs_order)        
 
     #Getting profiles phenotype stats table and data suitable for rontoplot
-    ehrhart_profiles = {row[0]: row[1].split(",") for row in plotter.hash_vars["omim2_hpo_profiles.txt"]}
-    do_profiles = {row[0]: row[1].split(",") for row in plotter.hash_vars["omim_hpo_profiles.txt"]}
+    ehrhart_OMIMids_with_pmids =  set([row[0] for row in plotter.hash_vars["omim2_pubmed_profiles.txt"]])
+    do_OMIMids_with_pmids =  set([row[0] for row in plotter.hash_vars["omim_pubmed_profiles.txt"]])
+
+    ehrhart_profiles = {row[0]: row[1].split(",") for row in plotter.hash_vars["omim2_hpo_profiles.txt"] if row[0] in ehrhart_OMIMids_with_pmids}
+    do_profiles = {row[0]: row[1].split(",") for row in plotter.hash_vars["omim_hpo_profiles.txt"] if row[0] in do_OMIMids_with_pmids}
     gs_profiles = {"ehrhart": ehrhart_profiles, "do": do_profiles}
     engine_profiles = {}
     profile_stats = {}

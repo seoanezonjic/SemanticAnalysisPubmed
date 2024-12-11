@@ -36,6 +36,7 @@ counter = -1
 with open(options["data_file"]) as f:
     for line in f:
         stats = line.strip().split('stats:')[1]
+        stats = stats.split(":")[0]
         stats = stats.split(',')
         file_stats = {key:int(value) if value.isnumeric() else value for key, value in map(lambda x: x.split("="), stats)}
 

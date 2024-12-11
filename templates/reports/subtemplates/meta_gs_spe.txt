@@ -24,9 +24,15 @@
 
 
 <%
+    #For Ontoplot
     ontology.load_profiles( gs_profiles[gs], reset_stored=True)
     hpo_freqs = ontology.get_profiles_terms_frequency(asArray=False, translate=False, count_parentals = True, min_freq = 0.015)
     plotter.hash_vars[f"ground_truth_term_freq_table_{gs}"] = copy.deepcopy(hpo_freqs)
+
+    #For terms level distribution plot
+    _, distribution_percentage = ontology.get_profile_ontology_distribution_tables()
+    distribution_percentage.insert(0, ["level", "ontology", "weighted cohort", "uniq terms cohort"])
+    plotter.hash_vars[f"{gs}_dist_perc"] = distribution_percentage
 %>
 <div style="overflow: hidden; display: flex; flex-direction: row; justify-content: center;">
 ${plotter.ontoplot(id=f"ground_truth_term_freq_table_{gs}", ontology="ontology", root_node="HP:0000118", reference_node="HP:0000118", 
@@ -36,14 +42,26 @@ ${plotter.ontoplot(id=f"ground_truth_term_freq_table_{gs}", ontology="ontology",
 <div style="overflow: hidden; display: flex; flex-direction: row; justify-content: center;">
 %for typee in ["abstracts", "papers"]:
     <%
+        #For Ontoplot
         ontology.load_profiles( engine_profiles[gs+typee], reset_stored=True)
         hpo_freqs = ontology.get_profiles_terms_frequency(asArray=False, translate=False, count_parentals = True, min_freq = 0.015)
         plotter.hash_vars[f"{gs}_term_freq_table_{typee}"] = copy.deepcopy(hpo_freqs)
+
+        #For terms level distribution plot
+        _, distribution_percentage = ontology.get_profile_ontology_distribution_tables()
+        distribution_percentage.insert(0, ["level", "ontology", "weighted cohort", "uniq terms cohort"])
+        plotter.hash_vars[f"{gs}_dist_perc_{typee}"] = distribution_percentage
     %>
     ${plotter.ontoplot(id=f"{gs}_term_freq_table_{typee}", ontology="ontology", root_node="HP:0000118", reference_node="HP:0000118", 
                         height=800, width=800, title=f"stEngine {typee.capitalize()} HPO Terms Frequency for {gs_names[gs]}", dynamic = True)}
 %endfor
 </div>
+
+${plotter.line(id= f"{gs}_dist_perc", header= True, x_label= 'Percentage of terms', title= f'{gs_names[gs]} HPO percentage distribution', width= "600px", height= "600px", responsive= False, transpose= True, config = { 'graphOrientation' : 'vertical' }) }
+%for typee in ["abstracts", "papers"]:
+    ${plotter.line(id= f"{gs}_dist_perc_{typee}", header= True, x_label= 'Percentage of terms', title= f'{gs_names[gs]} {typee} HPO percentage distribution', width= "600px", height= "600px", responsive= False, transpose= True, config = { 'graphOrientation' : 'vertical' }) }
+%endfor
+
 
 
 ${ plotter.create_title(f'{gs_names[gs]} Supplementary data', id=f'{gs}_table_from', hlevel=2, indexable=True, clickable=True, t_id=f'{gs}_table_to', clickable_text = '(Click me)') }

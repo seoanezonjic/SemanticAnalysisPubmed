@@ -28,6 +28,7 @@
     plotter.hash_vars["top_5_no_abstracts"][0] = [os.path.basename(file) for file in plotter.hash_vars["top_5_no_abstracts"][0]]
 
     total_stats = plotter.hash_vars["total_stats"]
+    #print(total_stats)
     total_stats[0].pop(1)
     total_stats[1].pop(1)
     total_stats_zipped = list(zip(*total_stats))

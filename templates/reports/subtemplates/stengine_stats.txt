@@ -1,4 +1,5 @@
 <% 
+    import os
     def plot_hexplot_without_marginals_1(data, plotter_list):
         g = plotter_list["sns"].jointplot(data=data, x="term_depth", y="counts", kind="hex")
         g.ax_marg_x.remove()
@@ -16,7 +17,7 @@
     published_years = [["year", "pmid"]] + [ [int(clean_num(row[2])), row[0]] for row in plotter.hash_vars["pubmed_metadata"][1:] 
                                                 if  row[2] != "0" and 
                                                     int(clean_num(row[2])) <= 2024 and 
-                                                    int(clean_num(row[2])) > 1930 and 
+                                                    int(clean_num(row[2])) >= 1965 and 
                                                     row[0] in papers_drawn_by_the_model]
     plotter.hash_vars["published_years"] = published_years
 
@@ -27,21 +28,34 @@
         plotter_list["plt"].yticks(ticks)
 
 
+    with open(os.path.join(os.getcwd(), "global_results", "paper_years"), "w") as f:
+        for row in plotter.hash_vars["published_years"][1:]:
+            f.write(f"{row[0]}\t{row[1]}\paper\n")
 
+    with open(os.path.join(os.getcwd(), "global_results", "paper_PMIDs_prevalence"), "w") as f:
+        for row in plotter.hash_vars["PMIDs_prevalence"][1:]:
+            f.write(f"{row[0]}\paper\n")
 
     section2 = '<div style="overflow: hidden; display: flex; flex-direction: row; justify-content: center;">' + "\n"
     section2 +=  plotter.static_plot_main(id="published_years", width = 400, height = 800, header=True, row_names= False, fields=[0], rezisable=False,
                                         title="Publication year", x_label = "Year", y_label = "",
                                         plotting_function=  plot_with_integer_ticks,
                                         img_attribs=f"width=31% height=45%" ) + "\n"
+    #section2 += plotter.boxplot(id="published_years", x_label = "Year", header=True, row_names= False, fields=[0], 
+    #                            title="Publication year", config= { "graphOrientation": "vertical"})
+    
     section2 +=  plotter.static_plot_main(id="similitudes", width = 400, height = 800, header=True, row_names= False, fields=[0], rezisable=False,
                                         title="Distribution of semantic scores", x_label = "Semantic Score", y_label = "Number of Abstract-HP term relations",
                                         plotting_function=  lambda data, plotter_list: plotter_list["sns"].boxplot(data=data, y="SIM_SCORE", showfliers=False),
                                         img_attribs=f"width=31% height=45%" ) + "\n"
+    
     section2 += plotter.static_plot_main(id="PMIDs_prevalence", width = 400, height = 800, header=True, row_names= False, fields=[0], rezisable=False,
                                         title="Distribution of abstract HP annotations", y_label = "Counts", x_label = "HP number per abstract", 
                                         plotting_function=  lambda data, plotter_list: plotter_list["sns"].boxplot(data=data, y="PREVALENCE", showfliers=False),
                                         img_attribs=f"width=31% height=45%" ) + "\n"
+    #section2 += plotter.boxplot(id="PMIDs_prevalence", header=True, row_names= False, fields=[0], x_label = "HP number per abstract",
+    #                            title="Distribution of abstract HP annotations", config= { "graphOrientation": "vertical"})
+    
     section2 += plotter.static_plot_main(id="HPOs_prevalence", width = 400, height = 800, header=True, row_names= False, fields=[0], rezisable=False,
                                         title="Distribution of HP annotations", y_label = "Counts", x_label = "Abstracts per HP", 
                                         plotting_function=  lambda data, plotter_list: plotter_list["sns"].boxplot(data=data, y="PREVALENCE", showfliers=False),

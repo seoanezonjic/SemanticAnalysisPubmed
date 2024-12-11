@@ -1,0 +1,281 @@
+
+<style>
+.tinyfont {
+    font-size: small;
+}
+.medfont {
+    font-size: medium;
+}
+.med {
+    width:75px;
+    height:50px;
+    font-size: large;
+    border-radius: 5px;
+    padding: 2px;
+    margin: 10px 5px 10px 5px;
+}
+.sma {
+    width:50px;
+    height:30px;
+    font-size: large;
+    border-radius: 3px;
+    padding: 0px;
+    margin: 5px 2.5px 5px 2.5px;
+}
+.iconifyNode {
+    background-repeat: no-repeat; 
+    background-size: contain; 
+    display: flex; 
+    flex-direction: row;  
+    align-items: center; 
+    justify-content: right; 
+    color:white;  
+}
+</style>
+
+<%
+def make_table(nrow:int, ncol:int, items:list)->str:
+    table = "<table>"
+    for i in range(nrow):
+        table += "<tr>"
+        for j in range(ncol):
+            table += f"<td>{items[i*ncol+j]}</td>"
+        table += "</tr>"
+    table += "</table>"
+    return table
+
+def make_list(*items:list)->str:
+    return "<br>".join([ f"{item}" for item in items])
+
+def title(text, em=True, u=True, h=0, size=None, doNO = False):
+    if doNO: return text
+    final_text = text
+    if em: final_text = f"<em>{final_text}</em>"
+    if u: final_text = f"<u>{final_text}</u>"
+    sizeclass =  f'class={size}' if size else ''
+    return f"<h{h} {sizeclass}>{final_text}</h{h}>" if h!=0 else f"<p {sizeclass}>{final_text}</p>"
+
+def title_sub(tit, subtitle, H=6):
+    return f"<h{H}>{title(tit, h=0)}<br>{title(subtitle, h=0, u=False)}</h{H}>"
+
+def style_files(nodelist):
+    return "\n".join([f"style {node} color:#000000, stroke:#AFCFEE, fill:#AFCFEE" for node in nodelist])
+
+def bg_img(url_basename):
+    return f"background-image:url(https://api.iconify.design/{url_basename}"
+
+def bg_col(color):
+    return f"background-color:{color}"
+
+def icon_node(idd, name, color, url_basename, size="med"):
+    sizecls = "med" if size == "med" else "sma"
+    if idd : text = f"{idd}((\"<div class='iconifyNode {sizecls}' style='{bg_col(color)}; {bg_img(url_basename)};'>{name}</div>\"))"
+    else: text = f"<div class='iconifyNode {sizecls}' style='{bg_col(color)}; {bg_img(url_basename)};'>{name}</div>"
+    return text
+
+blue = "rgb(51, 89, 204)"
+red = "rgb(255, 102, 102)"
+green = "rgb(0, 153, 77)"
+purple = "rgb(77, 0, 153)"
+dirt = "rgb(153, 102, 0)"
+black = "rgb(255, 255, 255)"
+pink = "rgb(204, 102, 153)"
+brown = "rgb(179, 89, 0)"
+olive = "rgb(134, 179, 0)"
+grey = "rgb(140, 140, 140)"
+
+omims1 = f"""
+            {icon_node("O1", "ID1", red, "fa6-solid:tag.svg")}
+            {icon_node("O2", "ID2", green, "fa6-solid:tag.svg")}
+            {icon_node("O3", "ID3", blue, "fa6-solid:tag.svg")}
+            {style_files(['O1','O2',"O3"])}
+"""
+omims2 = f"""
+            {icon_node("O2", "ID2", green, "fa6-solid:tag.svg")}
+            {icon_node("O3", "ID3", blue, "fa6-solid:tag.svg")}
+            {style_files(['O2',"O3"])}
+"""
+pmids1 = f"""
+            {icon_node("P1", "T44", red, "academicons:pubmed.svg")}
+            {icon_node("P2", "T23", green, "academicons:pubmed.svg")}
+            {icon_node("P3", "T53", blue, "academicons:pubmed.svg")}
+            {style_files(['P1','P2',"P3"])}
+"""
+pmids2 = f"""
+            {icon_node("P4", "T49", brown, "academicons:pubmed.svg")}
+            {icon_node("P5", "T23", green, "academicons:pubmed.svg")}
+            {icon_node("P6", "T53", blue, "academicons:pubmed.svg")}
+            {style_files(['P4','P5',"P6"])}
+"""
+pmids3 = f"""
+            {icon_node("P2", "T23", green, "academicons:pubmed.svg")}
+            {icon_node("P3", "T53", blue, "academicons:pubmed.svg")}
+            {style_files(['P2','P3'])}
+"""
+diseases=f"""
+            {icon_node("N1", "DN1", red, "covid:symptoms-nausea.svg")}
+            {icon_node("N2", "DN2", green, "healthicons:tb.svg")}
+            {icon_node("N3", "DN3", blue, "healthicons:deaf-outline.svg")}
+            {style_files(['N1','N2',"N3"])}
+"""
+phens1 = f"""
+            {icon_node("F1", "P5,P45,<br>P2", brown, "healthicons:clinical-fe.svg")}
+            {icon_node("F2", "P3,<br>P14", green, "healthicons:clinical-fe.svg")}
+            {icon_node("F3", "P7,<br>P51", blue, "healthicons:clinical-fe.svg")}
+            {style_files(['F1','F2',"F3"])}
+"""
+phens2 = f"""
+            {icon_node("F5", "P15,<br>P2", green, "healthicons:clinical-fe.svg")}
+            {icon_node("F6", "P24,P7,<br>P9", blue, "healthicons:clinical-fe.svg")}
+            {style_files(['F5',"F6"])}
+"""
+
+#FOR MERMAID 2
+omims_pmids_diseases = omims1 + pmids1 + diseases + f"""
+            N1 o--o O1 o--o P1
+            N2 o--o O2 o--o P2
+            N3 o--o O3 o--o P3
+"""
+
+table_omims_vectors = make_table(nrow=3, ncol=2, items = [
+    icon_node("", "ID1", red, "fa6-solid:tag.svg", size="sma"),icon_node("", "V1", grey, "humbleicons:arrow-right-up.svg", size="sma"),
+    icon_node("", "ID2", green, "fa6-solid:tag.svg", size="sma"),icon_node("", "V2", grey, "humbleicons:arrow-left-down.svg", size="sma"),
+    icon_node("", "ID3", blue, "fa6-solid:tag.svg", size="sma"), icon_node("", "V3", grey, "humbleicons:arrow-left-up.svg", size="sma")
+])
+table_pmids_vectors = make_table(nrow=3, ncol=2, items = [
+    icon_node("", "T49", brown, "academicons:pubmed.svg", size="sma"),icon_node("", "V4", grey, "humbleicons:arrow-up.svg", size="sma"),
+    icon_node("", "T44", red, "academicons:pubmed.svg", size="sma"),icon_node("", "V5", grey, "humbleicons:arrow-right-up.svg", size="sma"),
+    icon_node("", "T53", blue, "academicons:pubmed.svg", size="sma"),icon_node("", "V6", grey, "humbleicons:arrow-down.svg", size="sma")
+])
+
+table1 = make_table(nrow=3,ncol=3, items = [ 
+    icon_node(None, "0.89", grey, "fa6-solid:1.svg"), icon_node(None, "ID3", blue, "fa6-solid:tag.svg"), icon_node(None, "T44", red, "academicons:pubmed.svg"),
+    icon_node(None, "0.77", grey, "fa6-solid:2.svg"), icon_node(None, "ID3", blue, "fa6-solid:tag.svg"), icon_node(None, "T53", blue, "academicons:pubmed.svg"),
+    icon_node(None, "0.72", grey, "fa6-solid:3.svg"), icon_node(None, "ID3", blue, "fa6-solid:tag.svg"), icon_node(None, "T49", brown, "academicons:pubmed.svg")])
+
+#FOR MERMAID 3
+pmids_phens = pmids2 + phens1 + f"""
+            P4 o--o F1
+            P5 o--o F2
+            P6 o--o F3
+"""
+
+omims_pmids_phens = omims2 + pmids3 + phens2 + f"""
+            F5 o--o O2 o--o P2
+            F6 o--o O3 o--o P3
+"""
+
+table2 =  make_table(nrow=3,ncol=3, items = [
+    icon_node(None, "0.76", grey, "fa6-solid:1.svg"), icon_node(None, "ID3", blue, "fa6-solid:tag.svg"), icon_node(None, "T53", blue, "academicons:pubmed.svg"),
+    icon_node(None, "0.68", grey, "fa6-solid:2.svg"), icon_node(None, "ID3", blue, "fa6-solid:tag.svg"), icon_node(None, "T23", green, "academicons:pubmed.svg"),
+    icon_node(None, "0.60", grey, "fa6-solid:3.svg"), icon_node(None, "ID3", blue, "fa6-solid:tag.svg"), icon_node(None, "T49", brown, "academicons:pubmed.svg")])
+
+### MERMAID CHARTS
+semtools=f"""
+---
+title: Semtools
+config:
+    theme: base
+    themeVariables:
+        fontSize: "130%"
+---
+flowchart LR    
+    subgraph Queries["Embedding Queries<br>(stEngine)"]
+        A@{{ shape: doc, label: "{title('Queries')}<br>{make_list('ID','Name')}" }}
+        B@{{ shape: doc, label: "{title('Embedded<br>queries')}<br>{make_list('ID','vector')}" }}
+        style A fill:#99ccff
+        style B fill:#99ccff
+    end
+    A -->|Embedd| B
+    
+        
+    subgraph Processing["Processing<br>(Get Corpus Index)"]
+        C@{{ shape: docs, label: "{title('Raw<br>Corpus')}"}}
+        D@{{ shape: docs, label: "{title('Corpus<br>Indexes')}<br>{make_list('ID','text','metadata')}" }}
+        C -->|Parse and<br>prepare indexes| D
+        style C fill:#ffff99
+        style D fill:#ffff99
+    end
+    
+    subgraph Embedding["Embedding (stEngine)"]
+        E@{{ shape: docs, label: "{title('Embedded<br>corpus')}<br>{make_list('ID','vector')}"}}
+        D -->|Embedd| E
+        style E fill:#ffff99
+    end    
+
+
+    subgraph Similarities["Get similarities (stEngine)"]
+        F@{{ shape: doc, label: "{title('Related query-corpus pairs')}<br>{make_list('QueryID','CorpusID','Similarity')}" }}
+        style F fill:#66ffc2
+    end
+    B --> Similarities
+    E --> Similarities
+    
+    
+"""
+
+
+ddp=f"""
+---
+title: Direct Disease Prediction (DDP)
+config:
+    theme: base
+    themeVariables:
+        fontSize: "150%"
+---
+flowchart LR
+    subgraph A["Diseases,IDs,PMIDs"]
+        direction LR
+        {omims_pmids_diseases}
+    end
+    subgraph Embeddings
+        direction LR
+        C@{{ label: "{title('Embedded queries',doNO=True)}{table_omims_vectors}"}}
+        D@{{ label: "{title('Embedded corpus',doNO=True)}{table_pmids_vectors}"}}
+    end
+    Results@{{label: "{title('Rankings', doNO=True)}{table1}"}}
+
+    A -->|"stEngine<br><h6>Embedd</h6>"| C
+    Embeddings -->|"stEngine<br><h6>Calculate<br>similarities</h6>"| Results 
+    A -->|"Get the PMID ranking<br>for the Disease ID"| Results
+    
+    {style_files(['A', 'C', 'D', 'Results'])}
+"""
+
+
+ipdp=f"""
+---
+title: Indirect Phenotype-based Disease Prediction (IPDP)
+config:
+    theme: base
+    themeVariables:
+        fontSize: "170%"
+---
+flowchart LR
+    subgraph Profiles
+        subgraph A["{title('Documents profiles',doNO=True)}"]
+            {pmids_phens}
+        end
+        subgraph B["{title('HPOs,IDs,PMIDs',doNO=True)}"]
+            direction LR
+            {omims_pmids_phens}
+        end
+    end        
+    Results@{{label: "{title('Rankings',doNO=True)}{table2}"}}
+
+    Profiles -->|"Semtools<br><h6>Profiles<br>comparison</h6>"| Results
+    B -->|"Get the PMID ranking<br>for the Disease ID"| Results
+
+    {style_files(['A', 'B', 'Results'])}
+"""
+%>
+
+
+${ plotter.prettify_div("<h1>General workflow using Semtools modules</h1>")}
+${ plotter.mermaid_chart(semtools)}
+
+${ plotter.prettify_div("<h1>Workflow for Direct Disease Prediction (DDP)</h1>")}
+${ plotter.mermaid_chart(ddp)}
+
+${ plotter.prettify_div("<h1>Workflow for Indirect Phenotype-based Disease Prediction (IPDP)</h1>")}
+${ plotter.mermaid_chart(ipdp)}

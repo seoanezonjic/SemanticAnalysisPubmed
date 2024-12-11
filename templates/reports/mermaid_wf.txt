@@ -1,0 +1,153 @@
+<%
+def title(text):
+    return f"<em><u><h5>{text}</h5></u></em>"
+def style_files(nodelist):
+    return "\n".join([f"style {node} color:#000000, stroke:#2962FF, fill:#AFCFEE" for node in nodelist])
+
+semtools=f"""
+---
+title: Semtools
+config:
+    theme: base
+    themeVariables:
+    primaryColor: "#00ff00"
+---
+flowchart LR    
+    subgraph Queries
+        %%FILES
+        A@{{ shape: doc, label: "{title('Queries')}<br>ID - Name"}}
+        B@{{ shape: doc, label: "{title('Embedded queries')}<br>ID - vector"}}
+
+        %%PROCESSES
+        W@{{ shape: rect, label: "{title('stEngine')}<br>Embedd"}}
+    end
+    A --> W
+    W --> B
+    
+    subgraph Corpus
+        %%FILES
+        C@{{ shape: docs, label: "{title('Raw Corpus')}"}}
+        D@{{ shape: docs, label: "{title('Corpus Indexes')}<br>ID - text - metadata"}}
+        E@{{ shape: docs, label: "{title('Embedded corpus')}<br>ID - vector"}}
+        
+        %%PROCESSES
+        X@{{ shape: rect, label: "{title('Get Corpus Index')}<br>Parse content and<br>prepare indexes"}}
+        Y@{{ shape: rect, label: "{title('stEngine')}<br>Embedd"}}
+        
+        subgraph Processing
+            C --> X
+            X --> D
+        end
+        subgraph Embedding
+            D --> Y
+            Y --> E
+        end    
+    end
+
+    subgraph Similarities
+        %%FILES
+        F@{{ shape: doc, label: "{title('Similarities')}<br>QueryID - CorpusID - Similarity"}}
+        %%PROCESSES
+        Z@{{ shape: rect, label: "{title('stEngine')}<br>Calculate similarities"}}
+    end
+    B --> Z
+    E --> Z
+    Z --> F
+    
+    %% NODES STYLES
+    {style_files(['A', 'B', 'C', 'D', 'E', 'F'])}
+
+"""
+
+
+
+ddp=f"""
+---
+title: Direct Disease Prediction (DDP)
+config:
+    theme: base
+    themeVariables:
+    primaryColor: "#00ff00"
+---
+flowchart LR
+    subgraph Gold Standard
+        %%FILES
+        A@{{ shape: doc, label: "{title('Queries')}<br>Disease ID - Name<br><ul><li><h6>OMIM:1 -- Disease 1</h6></li><li><h6>OMIM:2 -- Disease 2</h6></li><li>OMIM:3 -- Disease 3</li></ul><br>..."}}
+        B@{{ shape: doc, label: "{title('Diseases evidences')}<br>Disease ID - PMID<br><ul><li><h6>OMIM:1 -- PMID:44</h6></li><li><h6>OMIM:2 -- PMID:23</h6></li><li>OMIM:3 -- PMID:53</li></ul><br>..."}}
+    end
+          
+    %%FILES
+    C@{{ shape: doc, label: "{title('Embedded queries')}<br>Disease ID - vector"}}
+    D@{{ shape: doc, label: "{title('Embedded corpus')}<br>PMID - vector"}}
+    %%PROCESSES
+    X@{{ shape: rect, label: "{title('stEngine')}<br>Embedd"}}
+    Y@{{ shape: rect, label: "{title('stEngine')}<br>Calculate<br>similarities"}}
+    
+    A --> X
+    X --> C
+    C -->|"for each disease"| Y
+    D -->|"all the documents"| Y
+    
+    subgraph Results["Textual-based<br>Semantic Similarity<br>Rankings"]
+        %%FILES
+        E@{{ shape: doc, label: "{title('Disease ID - PMID - Similarity')}<br><ol><li><h6>OMIM:3 -- PMID:34 -- 0.89</h6></li><li>OMIM:3 -- PMID:53 -- 0.83</li><li><h6>OMIM:3 -- PMID:67 -- 0.78</h6></li></ol>"}}
+    end
+    Y --> Results
+    B -->|"Get the PMID ranking<br>for the Disease ID"| E
+    
+    %% NODES STYLES
+    {style_files(['A', 'B', 'C', 'D', 'E'])}
+"""
+
+#TODO:"Añadir descripcion de que los PMIDS del corpus son los del Gold Standard mas aleatorios"
+ipdp=f"""
+---
+title: Indirect Phenotype-based Disease Prediction (IPDP)
+config:
+    theme: base
+    themeVariables:
+    primaryColor: "#00ff00"
+---
+flowchart LR
+    %%PROCESSES
+    X@{{ shape: rect, label: "{title('Semtools')}<br>Profiles<br>comparison"}}
+
+    subgraph From General Workflow
+        %%FILES
+        A0@{{ shape: doc, label: "{title('Similarities')}<br>QueryID - CorpusID - Similarity<br><ul><li><h6>PMID:53 -- HP:7 -- 0.87</h6></li><li><h6>PMID:53 -- HP:88 -- 0.2</h6></li><li><h6>PMID:53 -- HP:51 -- 0.93</h6></li></ul>..."}}
+        A@{{ shape: doc, label: "{title('Documents profiles')}<br>PMID - Phenotypic Profile<br><ul><li><h6>PMID:31 -- HP:5,HP:45,HP:2</h6></li><li><h6>PMID:89 -- HP:3,HP:14</h6></li><li>PMID:53 -- HP:7,HP:51</li></ul><br>..."}}
+    end
+    A0 -->|"Filter by similarity and<br>aggregate queries by CorpusID"| A
+
+    subgraph Gold Standard
+        %%FILES
+        B@{{ shape: doc, label: "{title('Diseases evidences')}<br>Disease ID - PMID<br><ul><li><h6>OMIM:1 -- PMID:44</h6></li><li><h6>OMIM:2 -- PMID:23</h6></li><li>OMIM:3 -- PMID:53</li></ul><br>..."}}
+        C@{{ shape: doc, label: "{title('Diseases profiles')}<br>Disease ID - Phenotypic profile<br><ul><li><h6>OMIM:1 -- HP:3,HP:25</h6></li><li><h6>OMIM:2 -- HP:7</h6></li><li>OMIM:3 -- HP:24,HP:7,HP:9</li></ul><br>..."}}
+    end        
+
+    subgraph Results["Ontology-based<br>Semantic Similarity<br>Rankings"]
+        %%FILES
+        D@{{ shape: doc, label: "{title('Disease ID - PMID - Similarity')}<br><ol><li>OMIM:3 -- PMID:53 -- 0.71</li><li><h6>OMIM:3 -- PMID:34 -- 0.65</h6></li><li><h6>OMIM:3 -- PMID:67 -- 0.55</h6></li></ol>"}}
+    end
+        
+    C -->|For each disease| X
+    A -->|All the document profiles| X
+    X --> Results
+    B -->|"Get the PMID ranking<br>for the Disease ID"| D
+
+    %% NODES STYLES
+    {style_files(['A0','A', 'B', 'C', 'D'])}
+"""
+
+%>
+
+
+${ plotter.prettify_div("<h1>General workflow using Semtools modules</h1>")}
+${ plotter.mermaid_chart(semtools)}
+
+
+${ plotter.prettify_div("<h1>Workflow for Direct Disease Prediction (DDP)</h1>")}
+${ plotter.mermaid_chart(ddp)}
+
+${ plotter.prettify_div("<h1>Workflow for Indirect Phenotype-based Disease Prediction (IPDP)</h1>")}
+${ plotter.mermaid_chart(ipdp)}

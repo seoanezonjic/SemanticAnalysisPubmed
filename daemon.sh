@@ -13,8 +13,7 @@ export CODE_PATH=$CURRENT_PATH/scripts
 export TEMPLATES_PATH=$CURRENT_PATH/templates
 export AUTOFLOW_TEMPLATES=$TEMPLATES_PATH/autoflow
 export REPORTS_TEMPLATES=$TEMPLATES_PATH/reports
-#export METAREPORT_RESULTS_PATH=$CURRENT_PATH"/global_results/no_random_negatives/metareport"
-export METAREPORT_RESULTS_PATH=$CURRENT_PATH"/global_results/with_random_negatives/metareport"
+export OTHER_STATS_PATH=$CURRENT_PATH/other_stats
 
 export MODEL_PATH=$CURRENT_PATH/models
 export MODEL_NAME="all-mpnet-base-v2" #export MODEL_NAME="all-MiniLM-L6-v2"
@@ -26,10 +25,15 @@ export PYENV=$CURRENT_PATH/llm_env #TODO: Remove later
 export PATH=$CODE_PATH:$PATH
 
 export PUBMED_CHUNKSIZE_FILT=100
-################### RUN SPECIFIC PATHS
-source $1
-echo "DOING $RUN_NAME RUN"
 
+################### CONFIG DAEMON STARTS TO BEING APLIED HERE
+source $1
+
+#export METAREPORT_RESULTS_PATH=$CURRENT_PATH"/global_results/no_random_negatives/metareport"
+export METAREPORT_RESULTS_PATH=$CURRENT_PATH/global_results/$METAREPORT_CASE/metareport
+
+################### RUN SPECIFIC PATHS
+echo "DOING $RUN_NAME RUN"
 export RUN_FOLDER=$CURRENT_PATH"/runs/"$RUN_NAME
 export RUN_INPUTS_PATH=$RUN_FOLDER/"inputs"
 export RUN_TMP_PATH=$RUN_FOLDER/"tmp"
@@ -44,14 +48,15 @@ export ENGINE_EXEC_PATH=$FSCRATCH"/SemanticAnalysisPubmed/$RUN_NAME/EXECS_engine
 export PROFILES_EXEC_PATH=$FSCRATCH"/SemanticAnalysisPubmed/$RUN_NAME/EXECS_profiles"
 export PROOF_EXEC_PATH=$FSCRATCH"/SemanticAnalysisPubmed/$RUN_NAME/EXECS_proof"
 
-echo -e "engine_wf\t$ENGINE_EXEC_PATH" > $CURRENT_PATH/workflow_paths
+echo -e "phenotype_wf\t$ENGINE_EXEC_PATH" > $CURRENT_PATH/workflow_paths
 echo -e "bench_wf\t$PROFILES_EXEC_PATH" >> $CURRENT_PATH/workflow_paths
-echo -e "zerobench_wf\t$ZEROBENCH_EXEC_PATH" >> $CURRENT_PATH/workflow_paths
+echo -e "disease_wf\t$ZEROBENCH_EXEC_PATH" >> $CURRENT_PATH/workflow_paths
 echo -e "proof_wf\t$PROOF_EXEC_PATH" >> $CURRENT_PATH/workflow_paths
 
 mkdir -p $RESULTS_PATH; mkdir -p $RESULTS_PATH/reports; mkdir -p $RESULTS_PATH/reports/cohort_stEngine; mkdir -p $INPUTS_PATH ; mkdir -p $TMP_PATH
-mkdir -p $PUBMED_FILES_STATS_PATH; mkdir -p $AUTOFLOW_TEMPLATES; mkdir -p $REPORTS_TEMPLATES; mkdir -p $QUERIES_PATH ; mkdir -p $TEMPLATES_PATH; 
-mkdir -p $RUN_FOLDER; mkdir -p $RUN_TMP_PATH; mkdir -p $RUN_INPUTS_PATH; mkdir -p $METAREPORT_RESULTS_PATH; mkdir -p $PYENV
+mkdir -p $PUBMED_FILES_STATS_PATH; mkdir -p $AUTOFLOW_TEMPLATES; mkdir -p $REPORTS_TEMPLATES; mkdir -p $TEMPLATES_PATH; 
+mkdir -p $RUN_FOLDER; mkdir -p $RUN_TMP_PATH; mkdir -p $RUN_INPUTS_PATH; mkdir -p $METAREPORT_RESULTS_PATH; mkdir -p $PYENV;
+mkdir -p $OTHER_STATS_PATH
 #OTHER VARIABLES
 export database_ids="OMIM ORPHA"
 
@@ -62,23 +67,16 @@ echo -e $TITLE_BLACKLISTED_WORDS | tr ";" "\n" > $RUN_TMP_PATH/blacklisted_words
 if [ "$2" == "goldstandard" ]; then #DOWNLOAD AND PREPARE GOLD STANDARDS TO ASSESS MODEL PERFORMANCE
 		prepare_all_goldstandards.sh
 
-elif [ "$2" == "download" ] ; then # DOWNLOAD MODEL
+elif [ "$2" == "download" ] ; then # DOWNLOAD EMBEDDING MODEL
 		#Download model
 		mkdir -p $MODEL_PATH
-		source $PYENV/bin/activate #TODO: Remove later
 		stEngine -m $MODEL_NAME -p $CURRENT_MODEL -v
 
 elif [ "$2" == "queries" ] ; then
 		mkdir -p $QUERIES_PATH
-		
-		#PREPARING HPO QUERY
-		semtools -O HPO -C CNS/HP:0000118 > $QUERIES_PATH/hpo_list
-		semtools --list_term_attributes -O HPO -S "," | awk '{FS="\t";OFS="\t"}{print $1,$2,$3-1}' | cut -f 1,3 > $TMP_PATH/HPO_terms_depth
+		prepare_all_queries.sh
 
-		#PREPARING OMIM QUERY
-		grep -P "Number Sign|Percent" $OMIM_QUERY_INPUT_DATA | grep -v "#" | cut -f 2,3 | cut -d ";" -f 1 | sed -E "s/([0-6][0-9]{5})/OMIM:\1/g" > $QUERIES_PATH/omim_list
-
-elif [ "$2" == "zerobench_wf" ] ; then
+elif [ "$2" == "disease_wf" ] ; then #Direct Disease Prediction (DDP) workflow
 		mkdir -p $ZEROBENCH_EXEC_PATH
 		source ~soft_bio_267/initializes/init_autoflow
 		variables=`echo -e "
@@ -107,11 +105,12 @@ elif [ "$2" == "zerobench_wf" ] ; then
 			\\$omim_file=$INPUTS_PATH/$ZEROBENCH_GOLD_STANDARD,
 			\\$metareport_tag=$METAREPORT_TAG,
 			\\$metareport_results_path=$METAREPORT_RESULTS_PATH,
-			\\$add_random_papers=$ADD_RANDOM_PAPERS			       
+			\\$add_random_papers=$ADD_RANDOM_PAPERS,
+			\\$other_stats_path=$OTHER_STATS_PATH		       
 			" | tr -d [:space:]`
 		AutoFlow -e -w $AUTOFLOW_TEMPLATES/zero_bench.af -V $variables -o $ZEROBENCH_EXEC_PATH -m 20gb -t 3-00:00:00 -n cal -c 10 -L $3
 
-elif [ "$2" == "engine_wf" ] ; then
+elif [ "$2" == "phenotype_wf" ] ; then #Indirect Phenotype-based Disease Prediction (IPDP) workflow
 		mkdir -p $ENGINE_EXEC_PATH; 
 		source ~soft_bio_267/initializes/init_autoflow
 		variables=`echo -e "
@@ -121,7 +120,7 @@ elif [ "$2" == "engine_wf" ] ; then
 			\\$soft_min_similarity=$SOFT_MIN_SIMILARITY,
 			\\$hard_min_similarity=$HARD_MIN_SIMILARITY,
 			\\$top_k=$TOP_K,
-			\\$splitted=$SPLIT_DOC,
+			\\$split_doc=$SPLIT_DOC,
 			\\$doc_type=$DOC_TYPE,
 			\\$equivalences=$EQUIVALENCES,
 			\\$queries=$QUERIES_PATH/hpo_list,
@@ -149,10 +148,12 @@ elif [ "$2" == "engine_wf" ] ; then
 			" | tr -d [:space:]`
 		AutoFlow -e -w $ENGINE_AUTOFLOW_TEMPLATE_PATH -V $variables -o $ENGINE_EXEC_PATH -m 20gb -t 3-00:00:00 -n cal -c 10 -L $3
 
-
-
 elif [ "$2" == "prepare_bench" ]; then
 		for GOLD in $GOLD_STANDARDS; do
+			echo "Preparing $GOLD benchmark"
+			#Get GS HPO profiles with PMIDs (general, not specific to the model)
+			cut -f 1 $INPUTS_PATH/$GOLD"_pubmed_profiles.txt" | sort -u > $TMP_PATH/$GOLD"_diseaseIDs_with_pmids"
+			grep -wf $TMP_PATH/$GOLD"_diseaseIDs_with_pmids" $INPUTS_PATH/$GOLD"_hpo_profiles.txt" > $INPUTS_PATH/general_$GOLD"_hpo_profiles"
 			#Get Model and Disease common pmIDs
 			desaggregate_column_data -i $INPUTS_PATH/$GOLD"_pubmed_profiles.txt" -x 2 | aggregate_column_data -i - -x 2 -a 1 > $RUN_TMP_PATH/reverse_aggregated_$GOLD"_pmid_profiles.txt"
 			intersect_columns -a $RUN_TMP_PATH/reverse_aggregated_$GOLD"_pmid_profiles.txt" -b $RESULTS_PATH/llm_pmID_profiles.txt -A 1 -B 1 --k c --full |\
@@ -204,11 +205,12 @@ elif [ "$2" == "reports" ]; then
 		#Preparing some data for benchmarking part
 		#python -m venv `basename $PYENV` --system-site-packages
 		source $PYENV/bin/activate #TODO: Remove later
+		#pip install -e $HOME/dev_py/py_semtools
 		#pip install -e $HOME/dev_py/py_report_html
 		#pip install matplotlib_venn
 
 		for GOLD in $GOLD_STANDARDS; do
-			mkdir -p $RESULTS_PATH/reports/cohort_"$GOLD"
+			mkdir -p $RESULTS_PATH/reports/cohort_"$GOLD"_of_common_pmids_with_model; mkdir -p $RESULTS_PATH/reports/cohort_"$GOLD"_general
 			echo "Getting $GOLD benchmark report"
 			echo $GOLD > $TMP_PATH/gold_filename_prefix.txt
 			data_paths=`echo -e "
@@ -232,9 +234,10 @@ elif [ "$2" == "reports" ]; then
 						-o $RESULTS_PATH/reports/stEngine_and_similitudes_$GOLD \
 						-s $REPORTS_TEMPLATES/subtemplates
 
-			#cohort_analyzer -i $RUN_INPUTS_PATH/"$GOLD"_HPOs_cleaned -o $RESULTS_PATH/reports/cohort_"$GOLD"/cohort_analyzer -d 0 -p 1 -S "," -m lin -a -H
+			cohort_analyzer -i $RUN_INPUTS_PATH/"$GOLD"_HPOs_cleaned -o $RESULTS_PATH/reports/cohort_"$GOLD"_of_common_pmids_with_model/cohort_analyzer -d 0 -p 1 -S "," -m lin -a -H
+			cohort_analyzer -i $INPUTS_PATH/general_$GOLD"_hpo_profiles" -o $RESULTS_PATH/reports/cohort_"$GOLD"_general/cohort_analyzer -d 0 -p 1 -S "," -m lin -a -H
 		done
-		#cohort_analyzer -i $RESULTS_PATH/llm_pmID_profiles.txt -o $RESULTS_PATH/reports/cohort_stEngine/cohort_analyzer -d 0 -p 1 -S "," -m lin -a -H
+		cohort_analyzer -i $RESULTS_PATH/llm_pmID_profiles.txt -o $RESULTS_PATH/reports/cohort_stEngine/cohort_analyzer -d 0 -p 1 -S "," -m lin -a -H
 
 elif [ "$2" == "prepare_metareport_data" ]; then 
 		source $PYENV/bin/activate #TODO: Remove later
@@ -258,7 +261,9 @@ elif [ "$2" == "metareport" ]; then
 			$METAREPORT_RESULTS_PATH/all_disease_data,
 			$METAREPORT_RESULTS_PATH/all_phenotype_data,
 			$INPUTS_PATH/omim_hpo_profiles.txt,
+			$INPUTS_PATH/omim_pubmed_profiles.txt,
 			$INPUTS_PATH/omim2_hpo_profiles.txt,
+			$INPUTS_PATH/omim2_pubmed_profiles.txt,
 			$METAREPORT_RESULTS_PATH/ehrhart_papers_llm_pmID_profiles.txt,
 			$METAREPORT_RESULTS_PATH/ehrhart_abstracts_llm_pmID_profiles.txt,
 			$METAREPORT_RESULTS_PATH/do_papers_llm_pmID_profiles.txt,
@@ -278,13 +283,22 @@ elif [ "$2" == "proof_wf" ]; then
 		source ~soft_bio_267/initializes/init_autoflow
 		mkdir -p $RESULTS_PATH/proof_of_concept
 
-		grep "601321" $INPUTS_PATH/omim_hpo_profiles.txt | cut -f 2 | tr "," "\n" > $RUN_TMP_PATH/noonan_profile.txt
-		grep "218040" $INPUTS_PATH/omim_hpo_profiles.txt | cut -f 2 | tr "," "\n" > $RUN_TMP_PATH/costello_profile.txt
-		grep "115150" $INPUTS_PATH/omim_hpo_profiles.txt | cut -f 2 | tr "," "\n" > $RUN_TMP_PATH/cfc_profile.txt #cardio-facio-cutaneous syndrome
+		grep OMIM:615547 $INPUTS_PATH/omim_hpo_profiles.txt | cut -f 2 | tr "," "\n" > $RUN_TMP_PATH/SCHAAF_YANG_profile.txt
+		#Get HPO profiles for diseases to proof
+		grep "OMIM:151100" $INPUTS_PATH/omim_hpo_profiles.txt | cut -f 2 | tr "," "\n" > $RUN_TMP_PATH/leopard_profile.txt
+		grep "OMIM:611431" $INPUTS_PATH/omim_hpo_profiles.txt | cut -f 2 | tr "," "\n" > $RUN_TMP_PATH/legius_profile.txt
+		grep "OMIM:162200" $INPUTS_PATH/omim_hpo_profiles.txt | cut -f 2 | tr "," "\n" > $RUN_TMP_PATH/nf_profile.txt
+		grep "OMIM:601321" $INPUTS_PATH/omim_hpo_profiles.txt | cut -f 2 | tr "," "\n" > $RUN_TMP_PATH/noonan_profile.txt
+		grep "OMIM:218040" $INPUTS_PATH/omim_hpo_profiles.txt | cut -f 2 | tr "," "\n" > $RUN_TMP_PATH/costello_profile.txt
+		grep "OMIM:115150" $INPUTS_PATH/omim_hpo_profiles.txt | cut -f 2 | tr "," "\n" > $RUN_TMP_PATH/cfc_profile.txt #cardio-facio-cutaneous syndrome
 		
 		echo $RUN_TMP_PATH/noonan_profile.txt > $RUN_TMP_PATH/diseases_to_proof
 		echo $RUN_TMP_PATH/costello_profile.txt >> $RUN_TMP_PATH/diseases_to_proof
 		echo $RUN_TMP_PATH/cfc_profile.txt >> $RUN_TMP_PATH/diseases_to_proof
+		echo $RUN_TMP_PATH/nf_profile.txt >> $RUN_TMP_PATH/diseases_to_proof
+		echo $RUN_TMP_PATH/SCHAAF_YANG_profile.txt >> $RUN_TMP_PATH/diseases_to_proof
+		echo $RUN_TMP_PATH/legius_profile.txt >> $RUN_TMP_PATH/diseases_to_proof
+		echo $RUN_TMP_PATH/leopard_profile.txt >> $RUN_TMP_PATH/diseases_to_proof
 		n_diseases=`wc -l $RUN_TMP_PATH/diseases_to_proof | cut -f 1 -d " "`
 		
 		variables=`echo -e "
@@ -325,4 +339,14 @@ elif [ `echo $2 | cut -f 2 -d "_"` == "recover" ]; then
 				echo "Recovering failed task of execution path: $path_to_check"
 				flow_logger -w -e $path_to_recover --sleep 0.1 -l -p $ADD_OPTIONS				
 		fi		
+
+elif [ "$2" == "mermaid" ]; then
+		source $PYENV/bin/activate #TODO: Remove later
+		data_paths=`echo -e "
+			$INPUTS_PATH/omim_hpo_profiles.txt
+			" | tr -d [:space:]`
+
+		report_html -d $data_paths \
+					-t $REPORTS_TEMPLATES/mermaid_icons.txt \
+					-o $RESULTS_PATH/reports/mermaid_workflows 
 fi

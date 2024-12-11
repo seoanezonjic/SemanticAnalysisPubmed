@@ -7,10 +7,11 @@ export ADD_RANDOM_PAPERS="no"
 export FILE_TO_GET_RANDOM=""
 
 export METAREPORT_TAG="all.abstracts"
+export METAREPORT_CASE="no_random_negatives" #with_random_negatives
 
 export CORPUS_PATH="/mnt2/fscratch/users/pab_001_uma/pedro/software_data/pubmed"
 
-export CHUNKSIZE=4
+export CHUNKSIZE=9
 export PUBMED_ITEMS_PER_FILE=300000
 export TEXT_BALANCE_SIZE=300000
 export AFTER_FILTER_SIZE=300000

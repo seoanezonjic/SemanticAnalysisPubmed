@@ -7,6 +7,7 @@ export ADD_RANDOM_PAPERS="yes"
 export FILE_TO_GET_RANDOM="/mnt/home/users/bio_267_uma/jperezg/projects/LLMs/SemanticAnalysisPubmed/runs/OMIM_ALL/splitpaper/results/llm_pmID_profiles.txt"
 
 export METAREPORT_TAG="do.papers"
+export METAREPORT_CASE="no_random_negatives" #with_random_negatives
 
 export CORPUS_PATH="/mnt2/fscratch/users/bio_267_uma/jperezg/papers/downloaded"
 

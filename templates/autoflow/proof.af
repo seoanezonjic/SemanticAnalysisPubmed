@@ -3,7 +3,9 @@ run_sorted_proofs_bin_[$diseases_range_number]){
     ontology=`semtools -d list | grep HPO`
     source $pyenv/bin/activate #TODO: Remove later
     export PATH=$code_path:$PATH
-    	
+    
+    #TEMPORAL: REMOVE PMCIDS FROM THE PROFILES AS THEY ARE BEING CONFLICTIVE
+    grep -v PMC $results_path/llm_pmID_profiles.txt > llm_pmID_profiles.txt
     current_disase_line=(*)
     disease_to_analyze_path=`sed "$current_disase_line"'q;d' $diseases_filepaths`
     disease_name=`basename $disease_to_analyze_path | cut -f 1 -d "."`
@@ -11,7 +13,7 @@ run_sorted_proofs_bin_[$diseases_range_number]){
     #Define a grep to remove LaTeX and other special characters
     grep -v -E '\\\(.*\)\\|\\$.*\\$|\\\[.*\\\]|\{{4}\\[a-zA-Z]+{[^{}]*}\}{4}|\\[a-zA-Z]+\s*{[^{}]*}' $pubmed_ids_and_titles | sort -u > pubmed_ids_and_titles
 	?
-	get_proof_template.py -r $disease_to_analyze_path -S "," -P $results_path/llm_pmID_profiles.txt -d 0 -p 1 -H -L "100,50" \
+	get_proof_template.py -r $disease_to_analyze_path -S "," -P llm_pmID_profiles.txt -d 0 -p 1 -H -L "100,50" \
                             -o $disease_name".html" -O $ontology -t $report_templates_path/proof.txt \
                             --disease_name $disease_name --pubmed_ids_and_titles pubmed_ids_and_titles
 }
