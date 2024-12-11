@@ -1,8 +1,12 @@
 #! /usr/bin/env bash
 source ~soft_bio_267/initializes/init_python
 
-############# 
-#export PYTORCH_CUDA_ALLOC_CONF='max_split_size_mb:128'
+#python -m venv `basename $PYENV` --system-site-packages
+#source $PYENV/bin/activate #TODO: Remove later
+#pip install -e $HOME/dev_py/py_semtools
+#pip install -e $HOME/dev_py/py_report_html
+#pip install matplotlib_venn
+#export PATH=$PYENV/bin:$PATH
 
 ############# GENERAL PATHS
 export CURRENT_PATH=`pwd`
@@ -168,8 +172,6 @@ elif [ "$2" == "prepare_bench" ]; then
 
 elif [ "$2" == "bench_wf" ]; then
 		source ~soft_bio_267/initializes/init_autoflow
-		source $PYENV/bin/activate #TODO: Remove later
-		export PATH=$PYENV/bin:$PATH
 
 		for GOLD in $GOLD_STANDARDS; do
 			#Get the number of records to process and the package size
@@ -197,18 +199,10 @@ elif [ "$2" == "bench_wf" ]; then
 		done
 
 elif [ "$2" == "prepare_results" ]; then
-		source $PYENV/bin/activate #TODO: Remove later
 		for GOLD in $GOLD_STANDARDS; do prepare_type_of_record_counts.sh $GOLD; done #outputs to $RESULTS_PATH/number_of_records_$GOLD.txt
 		get_pubmed_index_stats.py -d $RUN_TMP_PATH/abstracts_debug_stats.txt -o $PUBMED_FILES_STATS_PATH
 
 elif [ "$2" == "reports" ]; then
-		#Preparing some data for benchmarking part
-		#python -m venv `basename $PYENV` --system-site-packages
-		source $PYENV/bin/activate #TODO: Remove later
-		#pip install -e $HOME/dev_py/py_semtools
-		#pip install -e $HOME/dev_py/py_report_html
-		#pip install matplotlib_venn
-
 		for GOLD in $GOLD_STANDARDS; do
 			mkdir -p $RESULTS_PATH/reports/cohort_"$GOLD"_of_common_pmids_with_model; mkdir -p $RESULTS_PATH/reports/cohort_"$GOLD"_general
 			echo "Getting $GOLD benchmark report"
@@ -240,9 +234,6 @@ elif [ "$2" == "reports" ]; then
 		cohort_analyzer -i $RESULTS_PATH/llm_pmID_profiles.txt -o $RESULTS_PATH/reports/cohort_stEngine/cohort_analyzer -d 0 -p 1 -S "," -m lin -a -H
 
 elif [ "$2" == "prepare_metareport_data" ]; then 
-		source $PYENV/bin/activate #TODO: Remove later
-		export PATH=$PYENV/bin:$PATH
-
 		cp $CURRENT_PATH"/runs/OMIM_DO/splitpaper/results/llm_pmID_profiles.txt" $METAREPORT_RESULTS_PATH/do_papers_llm_pmID_profiles.txt
 		cp $CURRENT_PATH"/runs/OMIM_DO/splitabstract/results/llm_pmID_profiles.txt" $METAREPORT_RESULTS_PATH/do_abstracts_llm_pmID_profiles.txt
 		cp $CURRENT_PATH"/runs/OMIM_ehrhart/splitpaper/results/llm_pmID_profiles.txt" $METAREPORT_RESULTS_PATH/ehrhart_papers_llm_pmID_profiles.txt
@@ -252,8 +243,6 @@ elif [ "$2" == "prepare_metareport_data" ]; then
 		if [ ! -s $METAREPORT_RESULTS_PATH/pmid_titles ]; then cut -f 1 $METAREPORT_RESULTS_PATH/all_phenotype_data | sort -u | get_pmid_titles.py -i - -o $METAREPORT_RESULTS_PATH/pmid_titles ;fi
 
 elif [ "$2" == "metareport" ]; then
-		source $PYENV/bin/activate #TODO: Remove later
-		export PATH=$PYENV/bin:$PATH
 		HPO_PATH=`semtools -d list | grep HPO`
 		MONDO_PATH=`semtools -d list | grep MONDO`
 
@@ -282,23 +271,14 @@ elif [ "$2" == "metareport" ]; then
 elif [ "$2" == "proof_wf" ]; then
 		source ~soft_bio_267/initializes/init_autoflow
 		mkdir -p $RESULTS_PATH/proof_of_concept
+		rm $RUN_TMP_PATH/diseases_to_proof
 
-		grep OMIM:615547 $INPUTS_PATH/omim_hpo_profiles.txt | cut -f 2 | tr "," "\n" > $RUN_TMP_PATH/SCHAAF_YANG_profile.txt
-		#Get HPO profiles for diseases to proof
-		grep "OMIM:151100" $INPUTS_PATH/omim_hpo_profiles.txt | cut -f 2 | tr "," "\n" > $RUN_TMP_PATH/leopard_profile.txt
-		grep "OMIM:611431" $INPUTS_PATH/omim_hpo_profiles.txt | cut -f 2 | tr "," "\n" > $RUN_TMP_PATH/legius_profile.txt
-		grep "OMIM:162200" $INPUTS_PATH/omim_hpo_profiles.txt | cut -f 2 | tr "," "\n" > $RUN_TMP_PATH/nf_profile.txt
-		grep "OMIM:601321" $INPUTS_PATH/omim_hpo_profiles.txt | cut -f 2 | tr "," "\n" > $RUN_TMP_PATH/noonan_profile.txt
-		grep "OMIM:218040" $INPUTS_PATH/omim_hpo_profiles.txt | cut -f 2 | tr "," "\n" > $RUN_TMP_PATH/costello_profile.txt
-		grep "OMIM:115150" $INPUTS_PATH/omim_hpo_profiles.txt | cut -f 2 | tr "," "\n" > $RUN_TMP_PATH/cfc_profile.txt #cardio-facio-cutaneous syndrome
-		
-		echo $RUN_TMP_PATH/noonan_profile.txt > $RUN_TMP_PATH/diseases_to_proof
-		echo $RUN_TMP_PATH/costello_profile.txt >> $RUN_TMP_PATH/diseases_to_proof
-		echo $RUN_TMP_PATH/cfc_profile.txt >> $RUN_TMP_PATH/diseases_to_proof
-		echo $RUN_TMP_PATH/nf_profile.txt >> $RUN_TMP_PATH/diseases_to_proof
-		echo $RUN_TMP_PATH/SCHAAF_YANG_profile.txt >> $RUN_TMP_PATH/diseases_to_proof
-		echo $RUN_TMP_PATH/legius_profile.txt >> $RUN_TMP_PATH/diseases_to_proof
-		echo $RUN_TMP_PATH/leopard_profile.txt >> $RUN_TMP_PATH/diseases_to_proof
+		cat proof_diseases.txt | while read row; do #Get each OMIM ID and disease from the proof diseases and get their HPO profiles
+			omim_id=`echo $row | awk 'BEGIN{FS=","}{print $1}'`
+			disease=`echo $row | awk 'BEGIN{FS=","}{print $2}'`
+			grep $omim_id $INPUTS_PATH/omim_hpo_profiles.txt | cut -f 2 | tr "," "\n" > $RUN_TMP_PATH/$disease.txt
+			echo $RUN_TMP_PATH/$disease.txt >> $RUN_TMP_PATH/diseases_to_proof		
+		done
 		n_diseases=`wc -l $RUN_TMP_PATH/diseases_to_proof | cut -f 1 -d " "`
 		
 		variables=`echo -e "
@@ -341,12 +321,7 @@ elif [ `echo $2 | cut -f 2 -d "_"` == "recover" ]; then
 		fi		
 
 elif [ "$2" == "mermaid" ]; then
-		source $PYENV/bin/activate #TODO: Remove later
-		data_paths=`echo -e "
-			$INPUTS_PATH/omim_hpo_profiles.txt
-			" | tr -d [:space:]`
-
-		report_html -d $data_paths \
+		report_html -d $INPUTS_PATH/omim_hpo_profiles.txt \
 					-t $REPORTS_TEMPLATES/mermaid_icons.txt \
 					-o $RESULTS_PATH/reports/mermaid_workflows 
 fi
