@@ -1,0 +1,65 @@
+<%
+    import pandas as pd
+    from py_exp_calc.exp_calc import transform2obj
+    
+    matrix = plotter.hash_vars['similarity_matrix_lin.txt']
+    tree_path = dict(plotter.hash_vars['tree_path'])
+    x_axis = plotter.hash_vars['similarity_matrix_lin_x.lst']
+    x_axis_overlays = plotter.hash_vars['overlays.txt']
+
+
+    #Rearrenge the lin clusters list and make a dataframe with both lists
+
+    clusters, PMIDs = [], []
+    for clusterID, joinedPMIDs in plotter.hash_vars['lin_clusters.txt']:
+        for pmid in joinedPMIDs.split(","):
+            clusters.append(clusterID)
+            PMIDs.append(pmid) 
+    clusters_df = pd.DataFrame({'Cluster ID': clusters, 'PubMed ID': PMIDs})
+    #print(clusters_df.head())
+
+    #Create a dictionary to map cluster IDs to letters
+    labels = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    clusters_labels = {}
+    for idx, clusterID in enumerate(sorted(list(set(clusters)), key=lambda x: int(x))): 
+        clusters_labels[clusterID] = labels[idx]
+
+    #Map the cluster IDs to letters
+    clusters_df['Cluster ID'] = clusters_df['Cluster ID'].map(lambda clusterID: clusters_labels[clusterID])
+
+
+    #merge x_axis and x_axis_overlays (Raso ranks and clusters merged before) by PubMed ID column
+    x_axis_df = pd.DataFrame(x_axis, columns=['PubMed ID'])
+    x_axis_overlays_df = pd.DataFrame(x_axis_overlays[1:], columns=x_axis_overlays[0])
+    overlays_with_clusters = x_axis_overlays_df.merge(clusters_df, on='PubMed ID')
+    raso_cols = ['Noonan Rank', 'NF Rank', 'Costello Rank', 'CFC Rank']
+    for raso_col in raso_cols:
+        overlays_with_clusters[raso_col] = overlays_with_clusters[raso_col].map(lambda rank: rank if rank != 'X' else 'NO')
+        overlays_with_clusters[raso_col] = overlays_with_clusters[raso_col].map(lambda rank: "YES" if rank != 'NO' else rank)
+    #print(overlays_with_clusters.head())
+    overlays_full = x_axis_df.merge(overlays_with_clusters, on='PubMed ID')
+    overlays_full = overlays_full.drop(columns=['PubMed ID'])
+    overlays_full.index = list(x_axis_df['PubMed ID'])
+    
+    #Create the dataframe previous to concatenation
+    matrix_df = pd.DataFrame(matrix, columns=x_axis_df['PubMed ID'], index=list(x_axis_df['PubMed ID']))    
+    #print(matrix_df.head())
+    
+    #Add overlays to the beginning of the dataframe
+    full_matrix_df = pd.concat([overlays_full, matrix_df], axis=1)
+    plotter.hash_vars['full_matrix_df'] = full_matrix_df
+    #print(full_matrix_df.head())
+    
+    #Convert to list of lists
+    table, _, _ = transform2obj(full_matrix_df, outFormat = "lists", inFormat = "dataframe")
+    plotter.hash_vars['table'] = table
+    #print(table[:5])
+%>
+
+${ plotter.table(id = 'aggregated_top10_table.txt', styled="bs", header=True, text=True)}
+
+${ plotter.heatmap(id = 'table', tree=tree_path['tree_path'], title = "PMIDs' profiles similarity clustering for rasopathies top 10 articles", 
+                        header = True, row_names = True, x_label = "Similarity",
+                        transpose=False, smp_attr=[1,2,3,4,5], treeBy="b",
+                        config={"varOverlays":["Cluster ID", "Noonan Rank", "NF Rank", "Costello Rank", "CFC Rank"]}
+                )}

@@ -1,5 +1,22 @@
 <%
     import pandas as pd
+    def replace_empties(value): 
+        if value:
+            return value 
+        else: 
+            return 0
+
+    def recover_empty_values(value):
+        if value == 0:
+            return None
+        else:
+            return value
+
+    def replace_and_show(data):
+        plotter.fill(data, recover_empty_values)
+        print(data)
+
+
     disease=plotter.hash_vars["disease"].replace("_profile", "").capitalize()
     plotter.hash_vars["candidates_sims"].sort(key=lambda row: float(row[1]), reverse=True) 
     plotter.hash_vars["candidates_sims"] = plotter.hash_vars["candidates_sims"][0:50]
@@ -23,14 +40,22 @@ ${plotter.prettify_div(disease_div)}
         <div style="width: 90%; background-color:#ecf0f1; margin: 0 auto;"> 
             <h1 style="text-align: center; background-color:#d6eaf8">Similarity matrix</h1>
             ${plotter.prettify_div(
-                plotter.similarity_matrix_plot( id= "similarity_matrix", header= True, row_names= True )
+                plotter.heatmap( id= "similarity_matrix", header= True, row_names= True, 
+                                prefill = replace_empties, func = replace_and_show,
+                                x_label="Ontological Similarity", title = f"Top 50 articles more related to {disease} phenotypic profile",
+                                extra_data={'id': 'stEngine_sims_table', 'header': True, 'row_names':  True, 'prefill': replace_empties, 'func' : replace_and_show},
+                                config = {'sizeLegendTitle': 'Textual Similarity',
+                                          'setMaxX': 1,
+                                          'sizes': [3,8,9,11,13,15,16]} )
             )}
         </div>
 
         <div style="width: 90%; background-color:#ecf0f1; margin: 0 auto;"> 
             <h1 style="text-align: center; background-color:#d6eaf8">Negative terms matrix</h1>
             ${plotter.prettify_div(
-                plotter.similarity_matrix_plot( id= "negative_matrix", header= True, row_names= True )
+                plotter.heatmap( id= "negative_matrix", header= True, row_names= True,
+                                 title= f"Most recurrent negative terms found in top 50 articles for {disease}",
+                                 x_label= "Counts" )
             )}
         </div>
     </div>

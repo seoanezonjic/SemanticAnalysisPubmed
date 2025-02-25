@@ -30,7 +30,7 @@
 
 #GS3	######## PREPARING OMIM-PMIDs AND OMIM-HPOs profiles from Friederike Ehrhart paper ####### https://pubmed.ncbi.nlm.nih.gov/33947870/
     wget https://figshare.com/ndownloader/files/25769330 -O $TMP_PATH/omim2.txt
-    tail -n +2 $TMP_PATH/omim2.txt | awk 'BEGIN{IFS="\t";OFS="\t"}{print "OMIM:"$4,$3}' | grep -vE "OMIM:[^0-9]" | \
+    tail -n +2 $TMP_PATH/omim2.txt | cut -f 3,4 | grep -E "[0-9]+\s[0-9]+" | awk 'BEGIN{FS="\t";OFS="\t"}{print "OMIM:"$2,$1}' |\
             aggregate_column_data -i - -x 1 -a 2 > $INPUTS_PATH/omim2_pubmed_profiles.txt		
     ln -s $INPUTS_PATH/omim_hpo_profiles.txt $INPUTS_PATH/omim2_hpo_profiles.txt
 

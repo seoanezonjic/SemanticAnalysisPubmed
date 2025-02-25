@@ -1,3 +1,41 @@
+<%
+    table_cols_dict = { "metareport_tag": "Stat",
+                        "do.abstracts": "OMIM-DO - Abstracts", "ehrhart.abstracts": "OMIM-Ehrhart - Abstracts", 
+                        "do.papers": "OMIM-DO - Articles", "ehrhart.papers": "OMIM-Ehrhart - Articles"}
+    table_rows_dict = {"n_diseases": "Diseases tested",
+                        "total_pmids": "Total PMIDs",
+                        "unique_pmids": "Unique PMIDs",
+                        "unique_pmids_proportion": "Unique PMIDs proportion",
+                        "pmids_per_disease": "Average PMIDs per disease",
+                        "pmids_in_one_disease": "PMIDs in only one disease",
+                        "pmids_more_than_one_disease": "PMIDs in >1 disease",
+                        "mean_repetitions_pmid": "Mean repetitions of repeated PMIDs"}
+
+    phenotype_gs_counts = plotter.hash_vars['phenotype_gs_counts']
+    disease_gs_counts = plotter.hash_vars['disease_gs_counts']
+
+    for column_idx in range(len(phenotype_gs_counts[0])):
+        phen_col_val = phenotype_gs_counts[0][column_idx]
+        dis_col_val = disease_gs_counts[0][column_idx]
+        phenotype_gs_counts[0][column_idx] = table_cols_dict.get(phen_col_val, phen_col_val)
+        disease_gs_counts[0][column_idx] = table_cols_dict.get(dis_col_val, dis_col_val)
+
+    for row_idx in range(1, len(phenotype_gs_counts)):
+        phen_row_val = phenotype_gs_counts[row_idx][0]
+        dis_row_val = disease_gs_counts[row_idx][0]
+        phenotype_gs_counts[row_idx][0] = table_rows_dict.get(phen_row_val, phen_row_val)
+        disease_gs_counts[row_idx][0] = table_rows_dict.get(dis_row_val, dis_row_val)
+%>  
+
+${ plotter.create_title('General stats tables', id='gs_tables_from', hlevel=2, indexable=True, clickable=True, t_id='gs_tables_to', clickable_text = '(Click me)') }
+<% 
+    gs_tables = ("<h1> Stats for Direct Disease Prediction Benchmark</h1>"
+                           + plotter.table(id='disease_gs_counts', text=True)
+                           + "<h1> Stats for Indirect Phenotype-based Disease Prediction Benchmark</h1>"
+                           + plotter.table(id='phenotype_gs_counts', text=True) )
+%>
+${ plotter.create_collapsable_container('gs_tables_to', gs_tables, display="visible") }
+
 <div style="overflow: hidden; display: flex; flex-direction: row; justify-content: center;">
     ${ plotter.boxplot(id = 'all_both_data', header = True, row_names = True, height = 500, width= 800, title = "Disease and Phenotype rankings in Ehrhart vs Disease Ontology",
                         smp_attr = [5,6,7,8], fields = [0,2], x_label = "Normalized Rankings",

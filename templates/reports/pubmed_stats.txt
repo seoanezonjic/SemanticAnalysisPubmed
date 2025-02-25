@@ -1,0 +1,38 @@
+<% 
+    #abstract_profile_sizes  abstract_total_stats  abstract_years  omim_profile_sizes  paper_profile_sizes  paper_total_stats  paper_years
+    #PREPARING DATA FOR PUBMED DOWNLOADS STATS
+    abstract_total_stats = [int(row[1]) for row in plotter.hash_vars['abstract_total_stats'][1:]]
+    abstract_total_stats = ["Abstracts", abstract_total_stats[0], abstract_total_stats[2] + abstract_total_stats[3], abstract_total_stats[4]]
+    paper_total_stats = [int(row[1]) for row in plotter.hash_vars['paper_total_stats'][1:]]
+    paper_total_stats = ["Articles", paper_total_stats[0], paper_total_stats[2] + paper_total_stats[3], paper_total_stats[4]]
+    
+    stats_rownames = ["Stat", "Total initially downloaded documents", "With PMID/PMC and Content","With phenotypic profile"]
+    stats_table = [list(row) for row in zip(stats_rownames, abstract_total_stats, paper_total_stats)]
+    plotter.hash_vars["stats_table"] = stats_table
+
+    #PREPARING DATA FOR PUBMED YEARS BOXPLOT
+    is_year = lambda year: year.isdigit() and int(year) > 1950 and int(year) < 2025
+    abstract_years = ["Abstracts"] + [int(row[1]) for row in plotter.hash_vars['abstract_years'][1:] if is_year(row[1])]
+    paper_years = ["Articles"] + [int(row[1]) for row in plotter.hash_vars['paper_years'][1:] if is_year(row[1])]
+    years_table = [list(row) for row in zip(abstract_years, paper_years)]
+    plotter.hash_vars["years_table"] = years_table
+
+    #PREPARING DATA FOR PUBMED PROFILES SIZES
+    abstract_profile_sizes = ["Abstracts"] + [int(row[0]) for row in plotter.hash_vars['abstract_profile_sizes']]
+    paper_profile_sizes = ["Articles"] + [int(row[0]) for row in plotter.hash_vars['paper_profile_sizes']]
+    omim_profile_sizes = ["Diseases"] + [int(row[0]) for row in plotter.hash_vars['omim_profile_sizes']]
+    profile_sizes_table = [list(row) for row in zip(abstract_profile_sizes, paper_profile_sizes, omim_profile_sizes)]
+    plotter.hash_vars["profile_sizes_table"] = profile_sizes_table
+%>
+
+${plotter.table(id="stats_table", text=True)}
+
+${plotter.static_plot_main(id="years_table", header=True, row_names= False, fields=[0,1],
+                            title="Publication years distribution", x_label = "Type of document", y_label = "Year",
+                            plotting_function=  lambda data, plotter_list: plotter_list["sns"].boxplot(data=data))}
+
+
+
+${plotter.static_plot_main(id="profile_sizes_table", header=True, row_names= False, fields=[0,1,2],
+                            title="Publication years distribution", x_label = "Category", y_label = "Profile size",
+                            plotting_function=  lambda data, plotter_list: plotter_list["sns"].boxplot(data=data, showfliers=False))}

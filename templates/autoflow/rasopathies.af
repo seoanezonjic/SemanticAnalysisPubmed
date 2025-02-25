@@ -5,7 +5,8 @@ run_sorted_proofs_bin_[$diseases_range_number]){
     export PATH=$code_path:$PATH
     
     #TEMPORAL: REMOVE PMCIDS FROM THE PROFILES AS THEY ARE BEING CONFLICTIVE
-    grep -v PMC $results_path/llm_pmID_profiles.txt > llm_pmID_profiles.txt
+    #TODO remove head later
+    #grep -v PMC $results_path/llm_pmID_profiles_with_cosine_sim.txt > llm_pmID_profiles_with_cosine_sim.txt
     current_disase_line=(*)
     disease_to_analyze_path=`sed "$current_disase_line"'q;d' $diseases_filepaths`
     disease_name=`basename $disease_to_analyze_path | cut -f 1 -d "."`
@@ -13,7 +14,13 @@ run_sorted_proofs_bin_[$diseases_range_number]){
     #Define a grep to remove LaTeX and other special characters
     grep -v -E '\\\(.*\)\\|\\$.*\\$|\\\[.*\\\]|\{{4}\\[a-zA-Z]+{[^{}]*}\}{4}|\\[a-zA-Z]+\s*{[^{}]*}' $pubmed_ids_and_titles | sort -u > pubmed_ids_and_titles
 	?
-	get_proof_template.py -r $disease_to_analyze_path -S "," -P llm_pmID_profiles.txt -d 0 -p 1 -H -L "100,50" \
-                            -o $disease_name".html" -O $ontology -t $report_templates_path/proof.txt \
-                            --disease_name $disease_name --pubmed_ids_and_titles pubmed_ids_and_titles
+	get_proof_template.py -r $disease_to_analyze_path -S "," -P llm_pmID_profiles_with_cosine_sim.txt -d 0 -p 1 -H -L "35,50" \
+                            -o $disease_name"_improved_heat.html" -O $ontology -t $report_templates_path/proof.txt -N "20,50" \
+                            --disease_name $disease_name --pubmed_ids_and_titles pubmed_ids_and_titles --sim $ont_sim_method
+    
+    cp $disease_name"_improved_heat.html" $proof_folder/$disease_name"_improved_heat.html"
+    head -n 50 $disease_name"_improved_heat.txt" > top50
+    #rearrange_top_50.py top50 > top50_arranged
+    #rm top50; mv top50_arranged top50;
+    mv top50 $top10_raso_folder/$disease_name"_top10.txt"
 }

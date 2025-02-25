@@ -15,6 +15,7 @@ calc_sem_sim_chunk_$gold_[$package_number]){
 		grep $current_mondo_ID $mondo_pmID_profiles > current_mondo_pubmeds_goldstandard
 		?
 		semtools -i $llm_pmID_profiles -O HPO -o current_mondo_sims -s lin --reference_profiles current_mondo_hpo_profile -S ","
+		#semtools -i $llm_pmID_profiles -O HPO -o current_mondo_sims -s $ont_sim_method --reference_profiles current_mondo_hpo_profile -S ","
 		get_mondo_filtered_pmID_sim_values.py -s current_mondo_sims -m current_mondo_pubmeds_goldstandard -p $pubmed_metadata -o current_filtered.txt -t 10
 		cat current_filtered.txt >> filtered.txt
 	done
@@ -35,4 +36,23 @@ prepare_metareport_data){
 	?
 	cat aggregate_results)/llm_vs_$gold'_semantic_similarity_hpo_based.txt' |awk -v tag="$metareport_tag" 'BEGIN{OFS="\t"; split(tag,tag_arr,".")}{print $0,tag_arr[1],tag_arr[2]}' > phenotype_rankings_$tag_formatted
 	cp phenotype_rankings_$tag_formatted $metareport_results_path/../phenotype_rankings_$tag_formatted
+}
+
+get_goldstandard_stats){
+	rm filtered_rankings
+	ln -s aggregate_results)/llm_vs_$gold'_semantic_similarity_hpo_based.txt' filtered_rankings
+	n_diseases=`cut -f 6 filtered_rankings | sort -u | wc -l`
+	total_pmids=`cat filtered_rankings | wc -l`
+	unique_pmids=`cut -f 1 filtered_rankings | sort -u | wc -l`
+	unique_pmids_proportion=`echo "scale=2; $unique_pmids/$total_pmids" | bc`
+	pmids_per_disease=`echo "scale=2; $total_pmids/$n_diseases" | bc`
+	pmids_in_one_disease=`cut -f 1 filtered_rankings | sort | uniq -c | sed -E "s/^[ ]+//g" | tr " " "\t" | awk 'BEGIN{FS=OFS="\t"}{if($1 == 1) print $0}' | wc -l`
+	pmids_more_than_one_disease=`cut -f 1 filtered_rankings | sort | uniq -c | sed -E "s/^[ ]+//g" | tr " " "\t" | awk 'BEGIN{FS=OFS="\t"}{if($1 > 1) print $0}' | wc -l`
+	mean_repetitions_pmid=`cut -f 1 filtered_rankings | sort | uniq -c | sed -E "s/^[ ]+//g" | tr " " "\t" | awk 'BEGIN{FS=OFS="\t"}{if($1 > 1) print $0}' | cut -f 1 | awk 'BEGIN{acc=0}{acc+=$1}END{print acc/NR}'`
+	?
+	echo -e "metareport_tag\tn_diseases\ttotal_pmids\tunique_pmids\tunique_pmids_proportion\tpmids_per_disease\tpmids_in_one_disease\tpmids_more_than_one_disease\tmean_repetitions_pmid" > goldstandard_stats
+	echo -e "$metareport_tag\t$n_diseases\t$total_pmids\t$unique_pmids\t$unique_pmids_proportion\t$pmids_per_disease\t$pmids_in_one_disease\t$pmids_more_than_one_disease\t$mean_repetitions_pmid" >> goldstandard_stats
+	cat goldstandard_stats >> $RESULTS_PATH/GS_COUNTS_STATS/gs_stats.$metareport_tag.phenotype
+	meta_tag_reformatted=`echo $metareport_tag | tr "." "_" `
+	cat goldstandard_stats >> $metareport_results_path/GS_COUNTS_STATS/$meta_tag_reformatted'_phenotype'
 }

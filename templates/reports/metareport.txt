@@ -57,7 +57,7 @@
     for bench_type in ["phenotype", "disease"]:
         for doc_type in ["Full", "Abs"]:
             for dataset in ["Ehr", "DO"]:
-                print(f"Processing {bench_type} {doc_type} {dataset}")
+                #print(f"Processing {bench_type} {doc_type} {dataset}")
                 abs_rankings = np.array(sorted([int(row[3]) for row in plotter.hash_vars['all_both_data'] if row[-3] == dataset and row[-2] == doc_type and row[-1] == bench_type]))
                 cumms = [ np.mean(abs_rankings <= pos) for pos in range(1, len(abs_rankings)+1)]
                 norm_pos = np.array(range(1, len(cumms)+1)) / len(cumms)
@@ -100,6 +100,7 @@
 
     for gs in gs_profiles:
         for typee in ["papers", "abstracts"]:
+            #print(f"Processing {gs} {typee}")
             profile_stats[gs+typee] = [["pmid", "omim_id", "matches", "non_matches_sum", "non_matches_dif" ,"disease_unique", "stEngine_unique"]]
             engine_profiles[gs+typee] = {row[0]: row[1].split(",") for row in plotter.hash_vars[f"{gs}_{typee}_llm_pmID_profiles.txt"]}
             plotter.hash_vars[f"{gs}_table_{typee}"] = [["title", "norm_score", "omim_id", "full_match_hpos", "semantic_similar_hpos", "disease_unique", "stEngine_unique"]]
