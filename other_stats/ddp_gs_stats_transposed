@@ -1,9 +1,0 @@
--	do.abstracts	ehrhart.abstracts	do.papers	ehrhart.papers
-Number of diseases being tested	4046	4004	591	332
-Number of total PMIDs	5055	4234	615	336
-Number of unique PMIDs	4578	3989	542	299
-Unique PMIDs proportion	.90	.94	.88	.88
-Average number of PMIDs per disease	1.24	1.05	1.04	1.01
-PMIDs in only one disease	4313	3798	497	274
-PMIDs in more than one disease	265	191	45	25
-Mean repetitions of repeated PMIDs	2.8	2.28272	2.62222	2.48

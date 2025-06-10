@@ -3,9 +3,11 @@ inputs/
 queries/
 results/
 global_results/
+reports_for_the_paper/
 tmp/
 previous_results/
 debug/
 workflow_paths
 runs/
 llm_env/
+old_proof_diseases.txt

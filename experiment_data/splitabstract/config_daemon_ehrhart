@@ -1,7 +1,10 @@
 export RUN_NAME="OMIM_ehrhart/splitabstract"
 export ZEROBENCH_GOLD_STANDARD="omim2_pubmed_profiles.txt"
+export DISEASES_WITH_PMID_AND_PHENS_RAW="omim2_pubmed_and_hpo_profiles.txt"
 export GOLD_STANDARDS="omim2" #export GOLD_STANDARDS="omim omim2 mondo"
 export PREFILTER_PMIDS_FILE=$TMP_PATH/omim2_unique_PMIDs  #$TMP_PATH/pmids_to_filter_abstracts_omim
+export DOCTYPE_PLACEHOLDER_VAR="abstracts"
+export DOCUMENT_TYPE="abstracts"
 
 export ADD_RANDOM_PAPERS="yes"
 export GS_VS_RANDOM_RATIO=3
@@ -11,8 +14,9 @@ export METAREPORT_TAG="ehrhart.abstracts"
 export METAREPORT_CASE="with_random_negatives" #with_random_negatives #no_random_negatives
 
 export CORPUS_PATH="/mnt2/fscratch/users/pab_001_uma/pedro/software_data/pubmed"
+export PREPARED_CORPUS=$FSCRATCH"/SemanticAnalysisPubmed/CORPUS_PREPARATION/prepared_corpus/abstracts"
 
-export ONT_SIM_METHOD="eric"
+export ONT_SIM_METHOD="nweric"
 
 export CHUNKSIZE=9
 export PUBMED_ITEMS_PER_FILE=300000

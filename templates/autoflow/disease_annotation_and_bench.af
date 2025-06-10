@@ -10,18 +10,40 @@
 	if [[ ! -s pre_filtered_queries ]]; then exit 1; fi
 }
 
-%get_and_filter_abstracts){
-	resources: -n cal -c 250 -t '1-12:00:00' -m '680gb'
+%filter_abstracts){
+	resources: -n cal -c 10 -t '0-10:00:00' -m '100gb'
+	#resources: -n cal -c 250 -t '1-12:00:00' -m '680gb'
 	. ~soft_bio_267/initializes/init_python
 	ln -s get_goldstandard_PMIDs_and_OMIMIDs)/OMIM_PMIDS_TO_FILTER OMIM_PMIDS_TO_FILTER
+	ln -s filter_query)/pre_filtered_queries pre_filtered_queries
 	n_cpus=$(([cpu] - 3))
-	mkdir indexes
+	indexes=$prepared_corpus
 	?
-	get_corpus_index -i "$pubmed_path/*" -o indexes -t "pubmed_" -c $n_cpus -d $split_doc -p $doc_type $equivalences \
-					 -z $chunksize -k $pubmed_items_per_file -b $text_balance_size --split_output_files
-    zcat indexes/*.gz | grep -wf OMIM_PMIDS_TO_FILTER > filtered_corpus_raw
+	echo "Filtering abstracts"
+    zcat $indexes/*.gz | grep -wf OMIM_PMIDS_TO_FILTER > filtered_corpus_raw
 	intersect_columns -a filtered_corpus_raw -b OMIM_PMIDS_TO_FILTER -A 1 -B 1 --k c --full | cut -f 1-7 > filtered_corpus
 	
+	#GETTING DOCS RAW STATS
+	intersect_columns -a filtered_corpus_raw -b OMIM_PMIDS_TO_FILTER -A 1 -B 1 --k c --full | cut -f 1 > CORPUS_PMIDS_TO_FILT
+	cut -f 2 $omim_file | tr "," "\n" | grep -wf CORPUS_PMIDS_TO_FILT > raw_pmids
+	cut -f 1 pre_filtered_queries > raw_diseases
+	
+	if [[ $doctype_placeholder_var == "abstracts" ]]; then #Raw stats are collected from unprocessed abstracts
+		n_diseases=`cat raw_diseases | sort -u | wc -l`
+		total_pmids=`cat raw_pmids | wc -l`
+		unique_pmids=`cat raw_pmids | sort -u | wc -l`
+		unique_pmids_proportion=`echo "scale=2; $unique_pmids/$total_pmids" | bc`
+		pmids_per_disease=`echo "scale=2; $total_pmids/$n_diseases" | bc`
+		pmids_in_one_disease=`cat raw_pmids | sort | uniq -c | sed -E "s/^[ ]+//g" | tr " " "\t" | awk 'BEGIN{FS=OFS="\t"}{if($1 == 1) print $0}' | wc -l`
+		pmids_more_than_one_disease=`cat raw_pmids | sort | uniq -c | sed -E "s/^[ ]+//g" | tr " " "\t" | awk 'BEGIN{FS=OFS="\t"}{if($1 > 1) print $0}' | wc -l`
+		mean_repetitions_pmid=`cat raw_pmids | sort | uniq -c | sed -E "s/^[ ]+//g" | tr " " "\t" | awk 'BEGIN{FS=OFS="\t"}{if($1 > 1) print $0}' | cut -f 1 | awk 'BEGIN{acc=0}{acc+=$1}END{print acc/NR}'`
+		meta_tag_raw=`echo $metareport_tag | sed -E "s/abstracts|papers/raw/g"`
+		echo -e "metareport_tag\tn_diseases\ttotal_pmids\tunique_pmids\tunique_pmids_proportion\tpmids_per_disease\tpmids_in_one_disease\tpmids_more_than_one_disease\tmean_repetitions_pmid" > goldstandard_stats
+		echo -e "$meta_tag_raw\t$n_diseases\t$total_pmids\t$unique_pmids\t$unique_pmids_proportion\t$pmids_per_disease\t$pmids_in_one_disease\t$pmids_more_than_one_disease\t$mean_repetitions_pmid" >> goldstandard_stats
+		meta_tag_reformatted=`echo $meta_tag_raw | tr "." "_"`
+		cat goldstandard_stats > $metareport_results_path/GS_COUNTS_STATS/$meta_tag_reformatted'_disease'
+	fi
+
 	if [[ $add_random_papers == "yes" ]]; then
 		#total_files_number=`zcat indexes/*.gz | wc -l`
 		gold_files_number=`cat filtered_corpus | wc -l`
@@ -31,9 +53,9 @@
 		#zcat indexes/*.gz | awk -v rows="$random_files_indexes" 'BEGIN {split(rows, a); for (i in a) {map[a[i]] = 1}} FNR in map {print $0}' > random_chosen_files
 		#cat random_chosen_files >> filtered_corpus
 
-		zcat indexes/*.gz | cut -f 1 > all_pmids
+		zcat $indexes/*.gz | cut -f 1 > all_pmids
 		get_random_negatives.py --all_pmids all_pmids --pmids_to_skip OMIM_PMIDS_TO_FILTER --randoms_number $random_docs_number > random_pmids_to_add
-		zcat indexes/*.gz | grep -wf random_pmids_to_add > pre_filtered_randoms
+		zcat $indexes/*.gz | grep -wf random_pmids_to_add > pre_filtered_randoms
 		intersect_columns -a pre_filtered_randoms -b random_pmids_to_add -A 1 -B 1 --k c --full | cut -f 1-7 >> filtered_corpus
 	fi
 	rm filtered_corpus.gz; gzip filtered_corpus
@@ -43,13 +65,12 @@
 	grep -wf common_pmids $omim_file | cut -f 1 > OMIM_IDS_TO_FILTER
 	grep -wf OMIM_IDS_TO_FILTER $queries > filtered_queries
 	if [[ ! -s filtered_queries ]]; then echo "ERROR:there is no filtered queries"; exit 1; fi	
-	rm indexes/*
 }
 
 %query_abstracts){
-    resources: -n dgx -c 120 -t '6-00:00:00' -m '600gb' -A $n_gpus
+    resources: -n dgx -c 120 -t '2-00:00:00' -m '600gb' -A $n_gpus
 	. ~soft_bio_267/initializes/init_python
-	ln -s get_and_filter_abstracts)/OMIM_PMIDS_TO_FILTER OMIM_PMIDS_TO_FILTER
+	ln -s filter_abstracts)/OMIM_PMIDS_TO_FILTER OMIM_PMIDS_TO_FILTER
 	export MKL_NUM_THREADS=$(([cpu] - 3)) #Pytorch options for CPU
 	export OMP_NUM_THREADS=$(([cpu] - 3))
 
@@ -60,8 +81,8 @@
 	query_basename=`basename $queries`
 	?
 	stEngine -m $model_name -p $current_model \
-             -c get_and_filter_abstracts)/filtered_corpus.gz \
-             -q get_and_filter_abstracts)/filtered_queries \
+             -c filter_abstracts)/filtered_corpus.gz \
+             -q filter_abstracts)/filtered_queries \
              -k 0 -t "-1" -o semantic_scores \
              -g $gpu_csv $split_doc -v $use_gpu_for_sim_calc \
 			 --order "query-corpus"
@@ -74,7 +95,7 @@
 	. ~soft_bio_267/initializes/init_python
 	sleep 300
 	rm all_rankings_rankerlike
-	rm ALL_OMIM_IDS_TO_FILTER; ln -s get_and_filter_abstracts)/filtered_queries ALL_OMIM_IDS_TO_FILTER
+	rm ALL_OMIM_IDS_TO_FILTER; ln -s filter_abstracts)/filtered_queries ALL_OMIM_IDS_TO_FILTER
 	ln -s query_abstracts)/rankings rankings
 
 	package_size=20
@@ -136,7 +157,7 @@ get_goldstandard_stats){
 	?
 	echo -e "metareport_tag\tn_diseases\ttotal_pmids\tunique_pmids\tunique_pmids_proportion\tpmids_per_disease\tpmids_in_one_disease\tpmids_more_than_one_disease\tmean_repetitions_pmid" > goldstandard_stats
 	echo -e "$metareport_tag\t$n_diseases\t$total_pmids\t$unique_pmids\t$unique_pmids_proportion\t$pmids_per_disease\t$pmids_in_one_disease\t$pmids_more_than_one_disease\t$mean_repetitions_pmid" >> goldstandard_stats
-	cat goldstandard_stats >> $RESULTS_PATH/GS_COUNTS_STATS/gs_stats.$metareport_tag.disease
+	cat goldstandard_stats > $RESULTS_PATH/GS_COUNTS_STATS/gs_stats.$metareport_tag.disease
 	meta_tag_reformatted=`echo $metareport_tag | tr "." "_" `
-	cat goldstandard_stats >> $metareport_results_path/GS_COUNTS_STATS/$meta_tag_reformatted'_disease'
+	cat goldstandard_stats > $metareport_results_path/GS_COUNTS_STATS/$meta_tag_reformatted'_disease'
 }

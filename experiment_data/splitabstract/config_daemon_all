@@ -1,7 +1,10 @@
 export RUN_NAME="OMIM_ALL/splitabstract"
 export ZEROBENCH_GOLD_STANDARD="omim_pubmed_profiles.txt"
+export DISEASES_WITH_PMID_AND_PHENS_RAW=""
 export GOLD_STANDARDS="omim omim2 mondo" #export GOLD_STANDARDS="omim omim2 mondo"
 export PREFILTER_PMIDS_FILE=""
+export DOCTYPE_PLACEHOLDER_VAR="abstracts"
+export DOCUMENT_TYPE="abstracts"
 
 export ADD_RANDOM_PAPERS="no"
 export GS_VS_RANDOM_RATIO=0
@@ -11,8 +14,9 @@ export METAREPORT_TAG="all.abstracts"
 export METAREPORT_CASE="no_random_negatives" #with_random_negatives
 
 export CORPUS_PATH="/mnt2/fscratch/users/pab_001_uma/pedro/software_data/pubmed"
+export PREPARED_CORPUS=$FSCRATCH"/SemanticAnalysisPubmed/CORPUS_PREPARATION/prepared_corpus/abstracts"
 
-export ONT_SIM_METHOD="eric"
+export ONT_SIM_METHOD="nweric"
 
 export CHUNKSIZE=9
 export PUBMED_ITEMS_PER_FILE=300000
@@ -29,11 +33,12 @@ export SPLIT_DOC="-s"
 export DOC_TYPE="PubmedAbstract"
 export EQUIVALENCES=""
 
-export GPU_DEVICES="cuda:0-cuda:1-cuda:2-cuda:3-cuda:4-cuda:5-cuda:6-cuda:7"  #"cuda:0-cuda:1-cuda:2-cuda:3"
+#export GPU_DEVICES="cuda:0-cuda:1-cuda:2-cuda:3-cuda:4-cuda:5-cuda:6-cuda:7"
+export GPU_DEVICES="cuda:0-cuda:1-cuda:2-cuda:3"
 export N_GPUs="gres=gpu:"`echo $GPU_DEVICES | tr "-" "\n" | grep "cuda" | wc -l`
 export USE_GPU_FOR_SIM_CALC=""
 
-export TITLE_BLACKLISTED_WORDS="posters;abstracts;annual meeting;conference;congress;oral presentations"
+export TITLE_BLACKLISTED_WORDS=""
 
 #CREATE SEVERAL CORPUS BALANCED-FILLED FOLDERS TO DRISTIBUTE THE EMBEDDING AND SIM CALCULATION PROCESS IN SEVERAL NODES
 export PARALLEL_FOLDERS_BASENAME="chunk"

@@ -5,8 +5,7 @@ run_sorted_proofs_bin_[$diseases_range_number]){
     export PATH=$code_path:$PATH
     
     #TEMPORAL: REMOVE PMCIDS FROM THE PROFILES AS THEY ARE BEING CONFLICTIVE
-    #TODO remove head later
-    #grep -v PMC $results_path/llm_pmID_profiles_with_cosine_sim.txt > llm_pmID_profiles_with_cosine_sim.txt
+    grep -v PMC $results_path/llm_pmID_profiles_with_cosine_sim.txt > llm_pmID_profiles_with_cosine_sim.txt
     current_disase_line=(*)
     disease_to_analyze_path=`sed "$current_disase_line"'q;d' $diseases_filepaths`
     disease_name=`basename $disease_to_analyze_path | cut -f 1 -d "."`
@@ -16,11 +15,17 @@ run_sorted_proofs_bin_[$diseases_range_number]){
 	?
 	get_proof_template.py -r $disease_to_analyze_path -S "," -P llm_pmID_profiles_with_cosine_sim.txt -d 0 -p 1 -H -L "35,50" \
                             -o $disease_name"_improved_heat.html" -O $ontology -t $report_templates_path/proof.txt -N "20,50" \
-                            --disease_name $disease_name --pubmed_ids_and_titles pubmed_ids_and_titles --sim $ont_sim_method
+                            --disease_name $disease_name --pubmed_ids_and_titles pubmed_ids_and_titles --sim $ont_sim_method \
+                            --doc_type $doctype_placeholder_var #--overwrite_pickle
     
     cp $disease_name"_improved_heat.html" $proof_folder/$disease_name"_improved_heat.html"
     head -n 50 $disease_name"_improved_heat.txt" > top50
-    #rearrange_top_50.py top50 > top50_arranged
-    #rm top50; mv top50_arranged top50;
-    mv top50 $top10_raso_folder/$disease_name"_top10.txt"
+    cp top50 $top10_raso_folder/$disease_name"_top10.txt"
+    
+    head -n 50 $disease_name"_improved_heat_latex.txt" > $disease_name"_top50_latex_table_raw.txt"
+    shorten_title.py -i $disease_name"_top50_latex_table_raw.txt" -o $disease_name"_top50_latex_table.txt" --max_length 90
+    cp $disease_name"_top50_latex_table.txt" $proof_folder/$disease_name"_top50_latex_table.txt"
+
+    cut -f 4 top50 > top50_titles
+    wordcloud_cli --text top50_titles --imagefile $disease_name_"top50_titles_wordcloud.png"
 }

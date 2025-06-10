@@ -7,6 +7,9 @@
     x_axis = plotter.hash_vars['similarity_matrix_lin_x.lst']
     x_axis_overlays = plotter.hash_vars['overlays.txt']
 
+    #SIMILARITY METHOD USED
+    vars_dict = dict(plotter.hash_vars['ont_sim_method'])
+    ont_sim_method = vars_dict['ont_sim_method']
 
     #Rearrenge the lin clusters list and make a dataframe with both lists
 
@@ -15,7 +18,7 @@
         for pmid in joinedPMIDs.split(","):
             clusters.append(clusterID)
             PMIDs.append(pmid) 
-    clusters_df = pd.DataFrame({'Cluster ID': clusters, 'PubMed ID': PMIDs})
+    clusters_df = pd.DataFrame({'Cluster': clusters, 'PubMed ID': PMIDs})
     #print(clusters_df.head())
 
     #Create a dictionary to map cluster IDs to letters
@@ -25,16 +28,16 @@
         clusters_labels[clusterID] = labels[idx]
 
     #Map the cluster IDs to letters
-    clusters_df['Cluster ID'] = clusters_df['Cluster ID'].map(lambda clusterID: clusters_labels[clusterID])
+    clusters_df['Cluster'] = clusters_df['Cluster'].map(lambda clusterID: clusters_labels[clusterID])
 
 
     #merge x_axis and x_axis_overlays (Raso ranks and clusters merged before) by PubMed ID column
     x_axis_df = pd.DataFrame(x_axis, columns=['PubMed ID'])
     x_axis_overlays_df = pd.DataFrame(x_axis_overlays[1:], columns=x_axis_overlays[0])
     overlays_with_clusters = x_axis_overlays_df.merge(clusters_df, on='PubMed ID')
-    raso_cols = ['Noonan Rank', 'NF Rank', 'Costello Rank', 'CFC Rank']
+    raso_cols = ['NF1', 'NFNS', 'Noonan', 'Costello', 'CFC']
     for raso_col in raso_cols:
-        overlays_with_clusters[raso_col] = overlays_with_clusters[raso_col].map(lambda rank: rank if rank != 'X' else 'NO')
+        overlays_with_clusters[raso_col] = overlays_with_clusters[raso_col].map(lambda rank: rank if rank != '-' else 'NO')
         overlays_with_clusters[raso_col] = overlays_with_clusters[raso_col].map(lambda rank: "YES" if rank != 'NO' else rank)
     #print(overlays_with_clusters.head())
     overlays_full = x_axis_df.merge(overlays_with_clusters, on='PubMed ID')
@@ -56,10 +59,16 @@
     #print(table[:5])
 %>
 
+<h1> PMIDs' profiles similarity clustering for rasopathies top 10 articles. Similarity method used: ${ont_sim_method} </h1>
+
 ${ plotter.table(id = 'aggregated_top10_table.txt', styled="bs", header=True, text=True)}
 
-${ plotter.heatmap(id = 'table', tree=tree_path['tree_path'], title = "PMIDs' profiles similarity clustering for rasopathies top 10 articles", 
+${ plotter.heatmap(id = 'table', tree=tree_path['tree_path'], title="", #title = "PMIDs' profiles similarity clustering for rasopathies top 10 articles", 
                         header = True, row_names = True, x_label = "Similarity",
-                        transpose=False, smp_attr=[1,2,3,4,5], treeBy="b",
-                        config={"varOverlays":["Cluster ID", "Noonan Rank", "NF Rank", "Costello Rank", "CFC Rank"]}
+                        transpose=False, smp_attr=[1,2,3,4,5,6], treeBy="b",
+                        config={"varOverlays":["Cluster"] + raso_cols,
+                                "smpTextScaleFontFactor": 0.6,
+                                "varTextScaleFontFactor": 0.6,
+                                "varTextRotate": 40,
+                                'saveFilename': 'clustermap'}
                 )}

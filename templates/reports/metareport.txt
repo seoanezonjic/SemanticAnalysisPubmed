@@ -100,16 +100,14 @@
 
     for gs in gs_profiles:
         for typee in ["papers", "abstracts"]:
-            #print(f"Processing {gs} {typee}")
+            print(f"Processing {gs} {typee}")
             profile_stats[gs+typee] = [["pmid", "omim_id", "matches", "non_matches_sum", "non_matches_dif" ,"disease_unique", "stEngine_unique"]]
             engine_profiles[gs+typee] = {row[0]: row[1].split(",") for row in plotter.hash_vars[f"{gs}_{typee}_llm_pmID_profiles.txt"]}
             plotter.hash_vars[f"{gs}_table_{typee}"] = [["title", "norm_score", "omim_id", "full_match_hpos", "semantic_similar_hpos", "disease_unique", "stEngine_unique"]]
             for row in [filtered for filtered in plotter.hash_vars["all_phenotype_data"] if typee in filtered and gs in filtered]:
                 pmid, score, disease_id = row[0],row[2],row[5]
-
                 gs_profile_hpos = [term for term in gs_profiles[gs][disease_id]]
                 engine_profile_hpos = [term for term in engine_profiles[gs+typee][pmid.replace("PMID:", "")]]
-                
                 score = str(round(float(score),6))
                 pmid = pmid_to_title_dict.get(pmid.replace("PMID:",""), pmid)
                 disease_id = omim_code_to_name_dict.get(disease_id, disease_id)
@@ -129,12 +127,16 @@
                 plotter.hash_vars[f"{gs}_table_{typee}"].append([pmid, score, disease_id, full_match_HPs, similar_HPs, gs_unique, stEngine_unique])
         
             plotter.hash_vars[f"{gs}_profile_stats_{typee}"] = profile_stats[gs+typee]
+
+
+dict_vars = dict(plotter.hash_vars['ont_sim_method_used'])
+ont_sim_method_used = dict_vars['ONT_SIM_METHOD']
 %>
 
 
 <% plotter.set_header() %>
 
-${ plotter.create_title('General stats and comparisons between gold standards', id='gs_general_from', hlevel=1, indexable=True, clickable=True, t_id='gs_general_to', clickable_text = '(Click me)') }
+${ plotter.create_title(f'General stats and comparisons between gold standards. Ontological similarity method used: {ont_sim_method_used}', id='gs_general_from', hlevel=1, indexable=True, clickable=True, t_id='gs_general_to', clickable_text = '(Click me)') }
 <% 
     gs_general = (plotter.renderize_child_template(plotter.get_internal_template('meta_general.txt'), gs=gs))
 %>

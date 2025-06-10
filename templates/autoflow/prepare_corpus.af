@@ -1,0 +1,23 @@
+get_abstracts){
+	resources: -n cal -c 128 -t '1-10:00:00' -m '439gb'
+	#resources: -n cal -c 150 -t '1-10:00:00' -m '650gb'
+	. ~soft_bio_267/initializes/init_python
+	export PATH=$code_path:$PATH #TODO: Remove later
+	source $pyenv/bin/activate #TODO: Remove later
+
+	rm $prepared_corpus/pubmed*; rm ./logs/*; rm pmids_file_locator.txt
+
+	n_cpus=$(([cpu] - 3))
+	blacklisted_words=`echo "$blacklist_flag" | tr ":" " "`
+	echo "blacklisted words file is: $blacklisted_words" 
+	?
+	get_corpus_index -i "$pubmed_path/*" -o $prepared_corpus -t "pubmed_" -c $n_cpus -d $split_doc -p $doc_type $equivalences \
+					 -z $chunksize -k $pubmed_items_per_file -b $text_balance_size --split_output_files $blacklisted_words
+
+	for file in $prepared_corpus/*.gz; do
+		filename=$(basename "$file")
+		echo -e $filename"\t"`zcat $prepared_corpus/$filename | cut -f 1 | tr "\n" ","` >> pmids_file_locator.txt
+	done
+
+	cp pmids_file_locator.txt $prepared_corpus/../$document_type"_pmids_file_locator.txt"
+}

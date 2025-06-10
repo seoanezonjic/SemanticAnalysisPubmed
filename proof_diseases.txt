@@ -1,6 +1,7 @@
 OMIM:151100,leopard
 OMIM:611431,legius
 OMIM:162200,nf
-OMIM:601321,noonan
+OMIM:163950,noonan
+OMIM:601321,nf-noonan
 OMIM:218040,costello
 OMIM:115150,cfc

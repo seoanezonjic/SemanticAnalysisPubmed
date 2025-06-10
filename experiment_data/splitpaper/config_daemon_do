@@ -1,7 +1,10 @@
 export RUN_NAME="OMIM_DO/splitpaper"
 export ZEROBENCH_GOLD_STANDARD="omim_pubmed_profiles.txt"
+export DISEASES_WITH_PMID_AND_PHENS_RAW="omim_pubmed_and_hpo_profiles.txt"
 export GOLD_STANDARDS="omim" #export GOLD_STANDARDS="omim omim2 mondo"
 export PREFILTER_PMIDS_FILE=$TMP_PATH/omim_unique_PMIDs
+export DOCTYPE_PLACEHOLDER_VAR="articles"
+export DOCUMENT_TYPE="papers"
 
 export ADD_RANDOM_PAPERS="yes"
 export GS_VS_RANDOM_RATIO=3
@@ -11,8 +14,9 @@ export METAREPORT_TAG="do.papers"
 export METAREPORT_CASE="with_random_negatives" #with_random_negatives #no_random_negatives
 
 export CORPUS_PATH="/mnt2/fscratch/users/bio_267_uma/jperezg/papers/downloaded"
+export PREPARED_CORPUS=$FSCRATCH"/SemanticAnalysisPubmed/CORPUS_PREPARATION/prepared_corpus/papers"
 
-export ONT_SIM_METHOD="eric"
+export ONT_SIM_METHOD="nweric"
 
 export CHUNKSIZE=3
 export PUBMED_ITEMS_PER_FILE=40000
@@ -33,7 +37,7 @@ export GPU_DEVICES="cuda:0-cuda:1-cuda:2-cuda:3"   #"cuda:0-cuda:1"
 export N_GPUs="gres=gpu:"`echo $GPU_DEVICES | tr "-" "\n" | grep "cuda" | wc -l`
 export USE_GPU_FOR_SIM_CALC=""
 
-export TITLE_BLACKLISTED_WORDS=""
+export TITLE_BLACKLISTED_WORDS="posters;abstracts;annual meeting;conference;congress;oral presentations;poster presentations"
 
 #CREATE SEVERAL CORPUS BALANCED-FILLED FOLDERS TO DRISTIBUTE THE EMBEDDING AND SIM CALCULATION PROCESS IN SEVERAL NODES
 export PARALLEL_FOLDERS_BASENAME="chunk"

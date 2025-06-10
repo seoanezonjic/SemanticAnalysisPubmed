@@ -14,25 +14,19 @@
 
     def replace_and_show(data):
         plotter.fill(data, recover_empty_values)
-        print(data)
+        #print(data)
 
+    ont_sim_method = plotter.hash_vars['ont_sim_method']
+    disease = plotter.hash_vars["disease"].replace("_profile", "")
+    disease = disease.capitalize() if disease.lower() in ["noonan", "costello"] else disease.upper()
+    doc_type = plotter.hash_vars["doc_type"]
 
-    disease=plotter.hash_vars["disease"].replace("_profile", "").capitalize()
-    plotter.hash_vars["candidates_sims"].sort(key=lambda row: float(row[1]), reverse=True) 
-    plotter.hash_vars["candidates_sims"] = plotter.hash_vars["candidates_sims"][0:50]
-    
-    pubmed_ids_and_sims = pd.DataFrame(plotter.hash_vars["candidates_sims"], columns=["pubmed_id", "similarity"])
-    pubmed_ids_and_titles = pd.DataFrame(plotter.hash_vars["pubmed_ids_and_titles"], columns=["pubmed_id", "title", "article-type", "article-category"])
-    
-    pubmed_ids_sims_and_titles = pd.merge(pubmed_ids_and_sims, pubmed_ids_and_titles, on="pubmed_id", how="inner")
-    pubmed_ids_sims_and_titles.drop(columns=["article-type", "article-category"], inplace=True) #convert back to a list of lists and add the header back
-    pubmed_ids_sims_and_titles["similarity"] = pubmed_ids_sims_and_titles["similarity"].astype(float).round(2)
-    pubmed_ids_sims_and_titles["pubmed_id"] = pubmed_ids_sims_and_titles["pubmed_id"].apply(lambda pmid: f"<a href=https://pubmed.ncbi.nlm.nih.gov/{pmid}>{pmid}</a>")
-    plotter.hash_vars[f"supp_info.txt"] = pubmed_ids_sims_and_titles.values.tolist()
-    plotter.hash_vars[f"supp_info.txt"].insert(0, ["pubmed_id", "similarity", "title"])
+    doc_type_file_dict = {"abstracts": "abstracts", "articles": "papers"}
+    doc_type_file = doc_type_file_dict.get(doc_type, doc_type)
+    #print(plotter.hash_vars['similarity_matrix'])
 %>
 
-<%  disease_div = f"<h1> {disease} Syndrome</h1>"   %>
+<%  disease_div = f"<h1> {disease} Syndrome. Ontological similarity method used: {ont_sim_method}</h1>"   %>
 ${plotter.prettify_div(disease_div)}
 
 <div class="container-fluid row-offcanvas nopadding">
@@ -42,11 +36,18 @@ ${plotter.prettify_div(disease_div)}
             ${plotter.prettify_div(
                 plotter.heatmap( id= "similarity_matrix", header= True, row_names= True, 
                                 prefill = replace_empties, func = replace_and_show,
-                                x_label="Ontological Similarity", title = f"Top 50 articles more related to {disease} phenotypic profile",
+                                x_label="Ontological Similarity", title = f"Top 50 {doc_type} more related to {disease} syndrome phenotypic profile",
                                 extra_data={'id': 'stEngine_sims_table', 'header': True, 'row_names':  True, 'prefill': replace_empties, 'func' : replace_and_show},
                                 config = {'sizeLegendTitle': 'Textual Similarity',
-                                          'setMaxX': 1,
-                                          'sizes': [3,8,9,11,13,15,16]} )
+                                          #'setMaxX': 1,
+                                          'sizes': [3,8,9,11,13,15,16],
+                                          'saveFilename': f'heat_{doc_type_file}_{disease.lower()}',
+                                          'percentAspectRatioPlotArea': 0.65,
+                                          'varTextScaleFontFactor': 1,
+                                          'smpTextScaleFontFactor': 1,
+                                          "maxSmpStringLen": 60,
+                                          #'printMagnification': 4
+                                          } )
             )}
         </div>
 
@@ -54,15 +55,24 @@ ${plotter.prettify_div(disease_div)}
             <h1 style="text-align: center; background-color:#d6eaf8">Negative terms matrix</h1>
             ${plotter.prettify_div(
                 plotter.heatmap( id= "negative_matrix", header= True, row_names= True,
-                                 title= f"Most recurrent negative terms found in top 50 articles for {disease}",
-                                 x_label= "Counts" )
+                                 width = 700, height = 600,
+                                 title= f"Most recurrent negative terms found in top 50 {doc_type} for {disease} syndrome",
+                                 x_label= "Counts",
+                                 config = {'saveFilename': f'neg_{disease.lower()}',
+                                            #'percentAspectRatioPlotArea': 0.98,
+                                            'varTextScaleFontFactor': 0.7,
+                                            'smpTextScaleFontFactor': 0.7,
+                                            'varTextRotate': 45,
+                                            "maxSmpStringLen": 60,
+                                            #'printMagnification': 4
+                                            } )
             )}
         </div>
     </div>
 
     <div class="col-sm-5 nopadding">
         ${plotter.prettify_div(
-            plotter.table(id="supp_info.txt", styled="dt", text=True, header=True, attrib = {'class' : 'table'}, 
+            plotter.table(id="supp_info", styled="dt", text=True, header=True, attrib = {'class' : 'table'}, 
                 custom_buttons = ['copyHtml5', 'excelHtml5', 'csvHtml5', 'pdfHtml5'])
         )}
     </div>

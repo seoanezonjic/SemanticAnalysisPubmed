@@ -1,5 +1,0 @@
--	Number of diseases being tested	Number of total PMIDs	Number of unique PMIDs	Unique PMIDs proportion	Average number of PMIDs per disease	PMIDs in only one disease	PMIDs in more than one disease	Mean repetitions of repeated PMIDs
-do.abstracts	4046	5055	4578	.90	1.24	4313	265	2.8
-ehrhart.abstracts	4004	4234	3989	.94	1.05	3798	191	2.28272
-do.papers	591	615	542	.88	1.04	497	45	2.62222
-ehrhart.papers	332	336	299	.88	1.01	274	25	2.48

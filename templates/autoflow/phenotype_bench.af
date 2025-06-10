@@ -14,13 +14,14 @@ calc_sem_sim_chunk_$gold_[$package_number]){
 		grep $current_mondo_ID $mondo_hpo_profiles > current_mondo_hpo_profile
 		grep $current_mondo_ID $mondo_pmID_profiles > current_mondo_pubmeds_goldstandard
 		?
-		semtools -i $llm_pmID_profiles -O HPO -o current_mondo_sims -s lin --reference_profiles current_mondo_hpo_profile -S ","
-		#semtools -i $llm_pmID_profiles -O HPO -o current_mondo_sims -s $ont_sim_method --reference_profiles current_mondo_hpo_profile -S ","
+		semtools -i $llm_pmID_profiles -O HPO -o current_mondo_sims -s $ont_sim_method --reference_profiles current_mondo_hpo_profile -S ","
+		#semtools -i $llm_pmID_profiles -O HPO -o current_mondo_sims -s lin --reference_profiles current_mondo_hpo_profile -S ","
 		get_mondo_filtered_pmID_sim_values.py -s current_mondo_sims -m current_mondo_pubmeds_goldstandard -p $pubmed_metadata -o current_filtered.txt -t 10
 		cat current_filtered.txt >> filtered.txt
 	done
 	rm current_mondo_sims
-	if [[ ! -s filtered.txt ]]; then exit 1; fi #exit if no results
+	if [[ ! -s filtered.txt && -s chunk_specific_mondo_IDs ]]; then exit 1; fi #exit if no results
+	if [[ ! -s chunk_specific_mondo_IDs && ! -s $mondo_pmid_hpo_common_ids ]]; then exit 1; fi #exit if no inputs files existed
 	sleep 180
 }
 
@@ -52,7 +53,7 @@ get_goldstandard_stats){
 	?
 	echo -e "metareport_tag\tn_diseases\ttotal_pmids\tunique_pmids\tunique_pmids_proportion\tpmids_per_disease\tpmids_in_one_disease\tpmids_more_than_one_disease\tmean_repetitions_pmid" > goldstandard_stats
 	echo -e "$metareport_tag\t$n_diseases\t$total_pmids\t$unique_pmids\t$unique_pmids_proportion\t$pmids_per_disease\t$pmids_in_one_disease\t$pmids_more_than_one_disease\t$mean_repetitions_pmid" >> goldstandard_stats
-	cat goldstandard_stats >> $RESULTS_PATH/GS_COUNTS_STATS/gs_stats.$metareport_tag.phenotype
+	cat goldstandard_stats > $RESULTS_PATH/GS_COUNTS_STATS/gs_stats.$metareport_tag.phenotype
 	meta_tag_reformatted=`echo $metareport_tag | tr "." "_" `
-	cat goldstandard_stats >> $metareport_results_path/GS_COUNTS_STATS/$meta_tag_reformatted'_phenotype'
+	cat goldstandard_stats > $metareport_results_path/GS_COUNTS_STATS/$meta_tag_reformatted'_phenotype'
 }

@@ -1,7 +1,6 @@
 <%
-    table_cols_dict = { "metareport_tag": "Stat",
-                        "do.abstracts": "OMIM-DO - Abstracts", "ehrhart.abstracts": "OMIM-Ehrhart - Abstracts", 
-                        "do.papers": "OMIM-DO - Articles", "ehrhart.papers": "OMIM-Ehrhart - Articles"}
+    def make_bold(text): return f"<strong>{text}</strong>"
+    
     table_rows_dict = {"n_diseases": "Diseases tested",
                         "total_pmids": "Total PMIDs",
                         "unique_pmids": "Unique PMIDs",
@@ -11,28 +10,46 @@
                         "pmids_more_than_one_disease": "PMIDs in >1 disease",
                         "mean_repetitions_pmid": "Mean repetitions of repeated PMIDs"}
 
+    columns_order = ["do.raw", "do.abstracts", "do.papers", "ehrhart.raw", "ehrhart.abstracts", "ehrhart.papers"]
+    reformated_cols_index = [["Stat", "OMIM-DO", "colspan", "colspan", "OMIM-Ehrhart", "colspan", "colspan"],
+                             [ "rowspan",  "Raw", "Abstracts", "Articles", "Raw", "Abstracts", "Articles"]]
+ 
     phenotype_gs_counts = plotter.hash_vars['phenotype_gs_counts']
     disease_gs_counts = plotter.hash_vars['disease_gs_counts']
 
-    for column_idx in range(len(phenotype_gs_counts[0])):
-        phen_col_val = phenotype_gs_counts[0][column_idx]
-        dis_col_val = disease_gs_counts[0][column_idx]
-        phenotype_gs_counts[0][column_idx] = table_cols_dict.get(phen_col_val, phen_col_val)
-        disease_gs_counts[0][column_idx] = table_cols_dict.get(dis_col_val, dis_col_val)
+    if phenotype_gs_counts[0][1:] != columns_order: raise Exception("Columns did not come in the expected order")
+    if disease_gs_counts[0][1:] != columns_order: raise Exception("Columns did not come in the expected order")
+    phenotype_gs_counts.pop(0)
+    disease_gs_counts.pop(0)
+    phenotype_gs_counts = reformated_cols_index + phenotype_gs_counts
+    disease_gs_counts = reformated_cols_index + disease_gs_counts
 
     for row_idx in range(1, len(phenotype_gs_counts)):
         phen_row_val = phenotype_gs_counts[row_idx][0]
         dis_row_val = disease_gs_counts[row_idx][0]
-        phenotype_gs_counts[row_idx][0] = table_rows_dict.get(phen_row_val, phen_row_val)
-        disease_gs_counts[row_idx][0] = table_rows_dict.get(dis_row_val, dis_row_val)
+        if phenotype_gs_counts[row_idx][0] not in ["colspan", "rowspan"]: phenotype_gs_counts[row_idx][0] = make_bold(table_rows_dict.get(phen_row_val, phen_row_val))
+        if disease_gs_counts[row_idx][0] not in ["colspan", "rowspan"]: disease_gs_counts[row_idx][0] = make_bold(table_rows_dict.get(dis_row_val, dis_row_val))
+
+        if row_idx > 1:
+            for field_idx in range(1, len(phenotype_gs_counts[row_idx])): 
+                if "." in phenotype_gs_counts[row_idx][field_idx]: phenotype_gs_counts[row_idx][field_idx] = round(float(phenotype_gs_counts[row_idx][field_idx]),2)
+                if "." in disease_gs_counts[row_idx][field_idx]: disease_gs_counts[row_idx][field_idx] = round(float(disease_gs_counts[row_idx][field_idx]),2)
+    
+    for col_level in range(len(reformated_cols_index)):
+        for col_idx in range(len(reformated_cols_index[col_level])):
+            value = reformated_cols_index[col_level][col_idx]
+            if value not in ["colspan", "rowspan"]: reformated_cols_index[col_level][col_idx] = make_bold(value)
+
+    plotter.hash_vars['phenotype_gs_counts'] = phenotype_gs_counts
+    plotter.hash_vars['disease_gs_counts'] = disease_gs_counts
 %>  
 
 ${ plotter.create_title('General stats tables', id='gs_tables_from', hlevel=2, indexable=True, clickable=True, t_id='gs_tables_to', clickable_text = '(Click me)') }
 <% 
     gs_tables = ("<h1> Stats for Direct Disease Prediction Benchmark</h1>"
-                           + plotter.table(id='disease_gs_counts', text=True)
+                           + plotter.table(id='disease_gs_counts', text=True, styled="bs", attrib = {'class' : 'table table-striped'})
                            + "<h1> Stats for Indirect Phenotype-based Disease Prediction Benchmark</h1>"
-                           + plotter.table(id='phenotype_gs_counts', text=True) )
+                           + plotter.table(id='phenotype_gs_counts', text=True, styled="bs", attrib = {'class' : 'table table-striped'}) )
 %>
 ${ plotter.create_collapsable_container('gs_tables_to', gs_tables, display="visible") }
 
